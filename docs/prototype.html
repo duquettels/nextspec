@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NextSpec Dashboard</title>
+    <style>
+        :root {
+            /* Computer Blue Color Palette */
+            --bg-base: #070B14;
+            --bg-panel: #0F172A;
+            --bg-panel-grad: linear-gradient(145deg, #131D36, #0A0F1D);
+            --border: #1E2D4A;
+            --border-light: #2D416B;
+            --text-main: #F1F5F9;
+            --text-muted: #94A3B8;
+            --accent-blue: #3B82F6;
+            --accent-cyan: #06B6D4;
+            --good: #10B981;
+            --warn: #F59E0B;
+            --danger: #EF4444;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* Sidebar Navigation */
+        .sidebar {
+            width: 250px;
+            background-color: var(--bg-panel);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            padding: 25px 0;
+            z-index: 10;
+            box-shadow: 5px 0 20px rgba(0,0,0,0.3);
+        }
+
+        .brand {
+            font-size: 16px;
+            letter-spacing: 2px;
+            color: var(--accent-cyan);
+            padding: 0 25px;
+            margin-bottom: 35px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nav-item {
+            padding: 14px 25px;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 13px;
+            letter-spacing: 0.5px;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .nav-item:hover { background-color: rgba(59, 130, 246, 0.1); color: var(--text-main); }
+        .nav-item.active { 
+            border-left: 3px solid var(--accent-blue); 
+            color: var(--accent-cyan); 
+            background: linear-gradient(90deg, rgba(59, 130, 246, 0.15) 0%, transparent 100%); 
+        }
+
+        /* Main Content Area */
+        .main {
+            flex: 1;
+            padding: 25px 35px;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            flex-shrink: 0;
+        }
+
+        .header h1 { margin: 0; font-size: 22px; font-weight: 500; color: var(--text-main); }
+        .profile { font-size: 13px; color: var(--text-muted); display: flex; align-items: center; gap: 8px;}
+        .profile-badge { background: rgba(59, 130, 246, 0.2); color: var(--accent-blue); padding: 4px 10px; border-radius: 4px; border: 1px solid var(--accent-blue); }
+
+        /* Dashboard Layout */
+        .dashboard-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            flex: 1;
+        }
+
+        .top-section {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            gap: 20px;
+        }
+
+        .bottom-section {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+
+        .col { display: flex; flex-direction: column; gap: 20px; }
+
+        /* Panels */
+        .panel {
+            background: var(--bg-panel-grad);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            position: relative;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--accent-cyan);
+            margin: 0 0 15px 0;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* List Styling (System Summary) */
+        .sys-item { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+        .sys-item:last-child { border: none; padding-bottom: 0; }
+        .sys-label { color: var(--text-muted); }
+        .sys-val { color: var(--text-main); font-weight: 500; display: flex; align-items: center; gap: 6px; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; }
+        .dot.good { background-color: var(--good); box-shadow: 0 0 8px var(--good); }
+        .dot.warn { background-color: var(--warn); box-shadow: 0 0 8px var(--warn); }
+
+        /* Performance Overview */
+        .perf-circle {
+            width: 100px; height: 100px;
+            border-radius: 50%;
+            border: 4px solid var(--border-light);
+            border-top-color: var(--good);
+            margin: 15px auto;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .perf-circle span { font-size: 24px; font-weight: bold; color: var(--text-main); }
+        .perf-circle small { font-size: 10px; color: var(--text-muted); }
+
+        /* 3D Visualizer */
+        .visualizer-panel {
+            background: radial-gradient(circle at center, #131E38 0%, #070B14 100%);
+            border: 1px solid var(--border-light);
+            min-height: 400px; /* Ensures the visualizer has plenty of height */
+        }
+        .canvas-area {
+            flex: 1;
+            display: flex; align-items: center; justify-content: center;
+            border: 1px dashed var(--border-light);
+            border-radius: 6px;
+            color: var(--text-muted);
+            font-size: 14px;
+            letter-spacing: 1px;
+            margin-top: 10px;
+        }
+
+        /* Upgrades & Analysis */
+        .rec-item { background: rgba(255,255,255,0.03); border: 1px solid var(--border); padding: 12px; border-radius: 6px; margin-bottom: 10px; }
+        .rec-header { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 13px; font-weight: 500; }
+        .rec-price { color: var(--accent-cyan); font-weight: bold; }
+        .value-score { display: inline-block; font-size: 10px; background: rgba(16, 185, 129, 0.2); color: var(--good); padding: 2px 6px; border-radius: 4px; margin-top: 5px;}
+        .view-more { display: block; text-align: center; font-size: 11px; color: var(--accent-blue); text-decoration: none; margin-top: 10px; cursor: pointer;}
+
+        .metrics { display: flex; justify-content: space-between; font-size: 12px; margin-top: 15px; }
+        .metrics div { display: flex; flex-direction: column; gap: 4px; }
+        .metrics .val { font-size: 16px; font-weight: bold; color: var(--text-main); }
+        .gain { color: var(--good); }
+
+        /* AI Insight */
+        .ai-text { font-size: 13px; line-height: 1.6; color: var(--text-muted); margin-bottom: 15px; flex: 1; }
+        .sources { display: flex; gap: 10px; font-size: 10px; margin-top: auto; }
+        .source-tag { background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border); color: var(--text-main); }
+
+        /* How it works */
+        .step { font-size: 11px; color: var(--text-muted); margin-bottom: 8px; display: flex; gap: 8px; }
+        .step-num { background: var(--border); color: var(--text-main); width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 9px; }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <div class="brand">⬡ NEXTSPEC</div>
+        <div class="nav-item active">Dashboard</div>
+        <div class="nav-item">3D Builder</div>
+        <div class="nav-item">Optimizer</div>
+        <div class="nav-item">Upgrade Advisor</div>
+        <div class="nav-item">Price Checker</div>
+        <div style="flex: 1;"></div>
+        <div class="nav-item">⚙️ Settings</div>
+    </div>
+
+    <div class="main">
+        <div class="header">
+            <h1>Welcome back, Levi</h1>
+            <div class="profile">
+                Active Rig: <span class="profile-badge">HP OMEN 40L</span>
+            </div>
+        </div>
+
+        <div class="dashboard-wrapper">
+            <!-- TOP ROW: Summary & 3D Visualizer -->
+            <div class="top-section">
+                <!-- Left Column -->
+                <div class="col">
+                    <div class="panel">
+                        <div class="panel-title">System Summary <span>↻ 10:42 AM</span></div>
+                        <div class="sys-item"><span class="sys-label">CPU</span> <span class="sys-val"><div class="dot good"></div> Intel i7 12th Gen</span></div>
+                        <div class="sys-item"><span class="sys-label">GPU</span> <span class="sys-val"><div class="dot good"></div> RTX 4070 12GB</span></div>
+                        <div class="sys-item"><span class="sys-label">RAM</span> <span class="sys-val"><div class="dot good"></div> 32GB Kingston</span></div>
+                        <div class="sys-item"><span class="sys-label">Storage</span> <span class="sys-val"><div class="dot good"></div> 1TB NVMe SSD</span></div>
+                        <div class="sys-item"><span class="sys-label">PSU</span> <span class="sys-val"><div class="dot warn"></div> 800W Gold</span></div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-title">Performance Overview</div>
+                        <div class="perf-circle">
+                            <span>88</span>
+                            <small>/ 100 EXCELLENT</small>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-title">How It Works</div>
+                        <div class="step"><div class="step-num">1</div> Scan local WMI hardware info</div>
+                        <div class="step"><div class="step-num">2</div> AI maps compatibility</div>
+                        <div class="step"><div class="step-num">3</div> Fetch live vendor pricing</div>
+                    </div>
+                </div>
+
+                <!-- Right Column: 3D System (Expanded) -->
+                <div class="panel visualizer-panel">
+                    <div class="panel-title" style="margin-bottom: 0;">3D System Visualizer</div>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 5px;">Click a component to view detailed telemetry</div>
+                    <div class="canvas-area">
+                        [ Interactive R3F 3D Model Rendered Here ]
+                    </div>
+                </div>
+            </div>
+
+            <!-- BOTTOM ROW: 3 Info Panels -->
+            <div class="bottom-section">
+                <div class="panel">
+                    <div class="panel-title">Upgrade Recommendations</div>
+                    <div class="rec-item">
+                        <div class="rec-header"><span>Corsair RM1000x PSU</span> <span class="rec-price">$169.99</span></div>
+                        <div class="value-score">Value Score: 9.2 / 10</div>
+                    </div>
+                    <div class="rec-item">
+                        <div class="rec-header"><span>2TB Samsung 990 Pro</span> <span class="rec-price">$149.99</span></div>
+                        <div class="value-score">Value Score: 8.5 / 10</div>
+                    </div>
+                    <a class="view-more">VIEW ALL COMPATIBLE UPGRADES →</a>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-title">Price & Value Analysis</div>
+                    <div class="metrics">
+                        <div>
+                            <span class="sys-label">Current Value</span>
+                            <span class="val">$1,350</span>
+                        </div>
+                        <div>
+                            <span class="sys-label">Upgraded Value</span>
+                            <span class="val">$1,669</span>
+                        </div>
+                        <div>
+                            <span class="sys-label">Perf Gain</span>
+                            <span class="val gain">+ 18%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel" style="border-left: 3px solid var(--accent-cyan);">
+                    <div class="panel-title">AI Insight</div>
+                    <div class="ai-text">
+                        Your i7 and RTX 4070 provide exceptional 1440p framerates. To maximize future upgrade paths for next-gen GPUs, replacing your 800W PSU is the most strategic priority.
+                    </div>
+                    <div class="sources">
+                        <div class="source-tag">Amazon</div>
+                        <div class="source-tag">Newegg</div>
+                        <div class="source-tag">Microcenter</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
