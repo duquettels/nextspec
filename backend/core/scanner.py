@@ -16,11 +16,20 @@ def get_local_hardware():
     # Extract RAM and convert bytes to Gigabytes
     total_ram_bytes = sum([int(stick.Capacity) for stick in c.Win32_PhysicalMemory()])
     ram_gb = round(total_ram_bytes / (1024**3))
+
+    # Extract total storage across all local drives
+    total_storage_gb = 0
+    # DriveType=3 ensures we only scan local hard drives, ignoring USBs/Network drives
+    for disk in c.Win32_LogicalDisk(DriveType=3): 
+        if disk.Size:
+            # Convert raw bytes to GB
+            total_storage_gb += int(disk.Size) // (1024**3)
     
     hardware_profile = {
         "cpu": cpu,
         "gpu": gpu,
-        "ram_gb": ram_gb
+        "ram_gb": ram_gb,
+        "storage_gb": total_storage_gb
     }
     
     return hardware_profile

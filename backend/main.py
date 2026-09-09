@@ -47,6 +47,7 @@ class HardwareProfile(BaseModel):
     cpu: ComponentDetail
     gpu: ComponentDetail
     ram_gb: int
+    storage_gb: int
     analysis: AnalysisDetail
 
 class ScanResponse(BaseModel):
@@ -68,6 +69,7 @@ def run_diagnostic_scan():
     scanned_cpu = hardware.get("cpu", "Unknown CPU")
     scanned_gpu = hardware.get("gpu", "Unknown GPU")
     scanned_ram = hardware.get("ram_gb", 0)
+    scanned_storage = hardware.get("storage_gb", 0)
     
     #Retrieve raw scores from the mock database
     cpu_raw_score = MOCK_DB.get(scanned_cpu, {}).get("raw_score", 0)
@@ -92,6 +94,7 @@ def run_diagnostic_scan():
             "cpu": {"name": scanned_cpu, "score": cpu_rating},
             "gpu": {"name": scanned_gpu, "score": gpu_rating},
             "ram_gb": scanned_ram,
+            "storage_gb": scanned_storage,
             "analysis": {"bottleneck_detected": bottleneck, 
                          "system_status": "Optimal" if bottleneck == "None" else "Upgrade Recommended"}
         }
