@@ -48,5 +48,6 @@ Once the server is running, open your web browser and navigate to:
 
 ```bash
 http://localhost:8000/docs
-# This will load the interactive Swagger UI where you can view the exact JSON payload structure and test the /api/scan endpoint.
 ```
+
+This will load the interactive Swagger UI where you can view the exact JSON payload structure and test the /api/scan endpoint.
