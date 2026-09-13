@@ -178,10 +178,9 @@ if (loading) {
             </div>
 
             <div className="panel ai-panel">
-              <div className="panel-title">AI Insight</div>
+              <div className="panel-title">System Insight</div>
               <div className="ai-text">
-                Your i7 and RTX 4070 provide exceptional 1440p framerates. To maximize future upgrade paths
-                for next-gen GPUs, replacing your 800W PSU is the most strategic priority.
+                {hardware?.analysis?.insight_text || "Analyzing system telemetry..."}
               </div>
               <div className="sources">
                 <div className="source-tag">Amazon</div>
