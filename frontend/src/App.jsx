@@ -1,6 +1,41 @@
+import { useState, useEffect } from "react";
 import Sidebar from "./components/Sidebar";
 
 export default function App() {
+  const [hardware, setHardware] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Simulate an API call to fetch hardware data
+    fetch("http://localhost:8000/api/scan")
+      // Replace this with your actual API call
+      .then((response) => response.json())
+      .then(json => {
+        setHardware(json.data);
+        setLoading(false);
+      })
+      .catch((error) => {
+        console.error("Error fetching hardware data:", error);
+        setLoading(false);
+      });
+     }, []);
+if (loading) {
+    return (
+    <div className="app-shell">
+      <Sidebar />
+      <div className="main" style={{ justifyContent: 'center', alignItems: 'center' }}>
+        <h2>Loading hardware data...</h2>
+      </div>
+    </div>
+    );  
+  }
+
+  const cpuDot = hardware?.analysis?.bottleneck_detected === "CPU" ? "warn" : "good";
+  const gpuDot = hardware?.analysis?.bottleneck_detected === "GPU" ? "warn" : "good";
+  const ramDot = hardware?.analysis?.bottleneck_detected === "RAM" ? "warn" : "good";
+  const storageDot = hardware?.analysis?.bottleneck_detected === "Storage" ? "warn" : "good";
+  const psuDot = hardware?.analysis?.bottleneck_detected === "PSU" ? "warn" : "good";
+
   return (
     <div className="app-shell">
       <Sidebar />
@@ -9,7 +44,7 @@ export default function App() {
         <div className="header">
           <h1>Welcome back, Consumer!</h1>
           <div className="profile">
-            Active Rig: <span className="profile-badge">HP OMEN 40L</span>
+            Active Rig: <span className="profile-badge">Live System</span>
           </div>
         </div>
 
@@ -19,46 +54,59 @@ export default function App() {
               <div className="panel">
                 <div className="panel-title">
                   <span>System Summary</span>
-                  <span>↻ 10:42 AM</span>
+                  <span>↻ LIVE</span>
                 </div>
 
+                {/* CPU Data */}
                 <div className="sys-item">
                   <span className="sys-label">CPU</span>
                   <span className="sys-val">
-                    <span className="dot good" />
-                    Intel Core i7 12700F 12th Gen Processor
+                    <span className={`dot ${cpuDot}`} />
+                    {hardware?.cpu?.name || "Unknown CPU"}
                   </span>
                 </div>
 
+                {/* GPU Data */}
                 <div className="sys-item">
                   <span className="sys-label">GPU</span>
                   <span className="sys-val">
-                    <span className="dot good" />
-                    Nvidia Geforce RTX 4070 12GB
+                    <span className={`dot ${gpuDot}`} />
+                    {hardware?.gpu?.name || "Unknown GPU"}
                   </span>
                 </div>
 
+                {/* RAM Data */}
                 <div className="sys-item">
                   <span className="sys-label">RAM</span>
                   <span className="sys-val">
-                    <span className="dot good" />
-                    32GB Kingston DDR5 6000Mhz
+                    <span className={`dot ${ramDot}`} />
+                    {hardware?.ram_gb ? `${hardware.ram_gb} GB` : "Unknown"}
                   </span>
                 </div>
 
+                {/* Storage Data */}
                 <div className="sys-item">
                   <span className="sys-label">Storage</span>
                   <span className="sys-val">
-                    <span className="dot good" />
-                    1TB Samsung 990 Pro NVMe SSD
+                    <span className={`dot ${storageDot}`} />
+                    {hardware?.storage_gb ? `${hardware.storage_gb} GB` : "Unknown Storage"}
                   </span>
                 </div>
 
+                {/* PSU Data */}
                 <div className="sys-item">
                   <span className="sys-label">PSU</span>
                   <span className="sys-val">
-                    <span className="dot warn" />
-                    800W Corsair RM800x 80+ Gold
+                    <span className={`dot ${psuDot}`} />
+                    {hardware?.psu || "Unknown PSU"}
+                  </span>
+                </div>
+                
+              {/* System Status Analysis */}
+                <div className="sys-item">
+                  <span className="sys-label">Status</span>
+                  <span className="sys-val">
+                    {hardware?.analysis?.system_status || "Optimal"}
                   </span>
                 </div>
               </div>
@@ -66,8 +114,8 @@ export default function App() {
               <div className="panel">
                 <div className="panel-title">Performance Overview</div>
                 <div className="perf-circle">
-                  <span>88</span>
-                  <small>/ 100 EXCELLENT</small>
+                  <span>{hardware?.analysis?.overall_score || "N/A"}</span>
+                  <small>/ 100 {hardware?.analysis?.system_status === "Optimal" ? "EXCELLENT" : "WARNING"}</small>
                 </div>
               </div>
 
@@ -144,7 +192,7 @@ export default function App() {
           </div>
         </div>
       </div>
-    </div>
+  </div>
   );
 }
 

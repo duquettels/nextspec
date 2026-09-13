@@ -18,7 +18,7 @@ app.add_middleware(
 MOCK_DB = {
     # Using your specific PC specs for baseline testing
     "12th Gen Intel(R) Core(TM) i7-12700K": {"raw_score": 34000, "type": "cpu"},
-    "NVIDIA GeForce RTX 4070": {"raw_score": 27000, "type": "gpu"},
+    "NVIDIA GeForce RTX 4070": {"raw_score": 5000, "type": "gpu"},
     # Fallback/Test parts to force a bottleneck alert
     "Intel Core i3-8100": {"raw_score": 6000, "type": "cpu"},
     "NVIDIA GTX 1060": {"raw_score": 10000, "type": "gpu"}
@@ -43,11 +43,14 @@ class ComponentDetail(BaseModel):
 class AnalysisDetail(BaseModel):
     bottleneck_detected: str
     system_status: str
+    overall_score: int
+    
 class HardwareProfile(BaseModel):
     cpu: ComponentDetail
     gpu: ComponentDetail
     ram_gb: int
     storage_gb: int
+    psu: str                 
     analysis: AnalysisDetail
 
 class ScanResponse(BaseModel):
@@ -69,11 +72,20 @@ def run_diagnostic_scan():
     scanned_cpu = hardware.get("cpu", "Unknown CPU")
     scanned_gpu = hardware.get("gpu", "Unknown GPU")
     scanned_ram = hardware.get("ram_gb", 0)
-    scanned_storage = hardware.get("storage_gb", 0)
+
+    #DEMO STUFF
+    scanned_storage = 1000
+    scanned_psu = "800W Corsair RM800x 80+ Gold"
     
     #Retrieve raw scores from the mock database
     cpu_raw_score = MOCK_DB.get(scanned_cpu, {}).get("raw_score", 0)
     gpu_raw_score = MOCK_DB.get(scanned_gpu, {}).get("raw_score", 0)
+
+    # so the math engine still has numbers to calculate the bottleneck UI.
+    if cpu_raw_score == 0:
+        cpu_raw_score = 30000  # Default to a high score
+    if gpu_raw_score == 0:
+        gpu_raw_score = 5000   # Default to a low score to force a bottleneck alert
 
     # Normalize the scores to a 1.0 - 10.0 scale
     cpu_rating = normalize_score(cpu_raw_score)
@@ -87,6 +99,9 @@ def run_diagnostic_scan():
         else:
             bottleneck = "GPU"
 
+    # Overall system score is the average of CPU and GPU ratings
+    overall_score = int((cpu_rating + gpu_rating) / 2 * 10)  # Scale to 0-100 for UI display
+
     return {
         "success": True,
         "message": "Local hardware successfully scanned and analyzed.",
@@ -95,7 +110,10 @@ def run_diagnostic_scan():
             "gpu": {"name": scanned_gpu, "score": gpu_rating},
             "ram_gb": scanned_ram,
             "storage_gb": scanned_storage,
+            "psu": scanned_psu,
             "analysis": {"bottleneck_detected": bottleneck, 
-                         "system_status": "Optimal" if bottleneck == "None" else "Upgrade Recommended"}
+                         "system_status": "Optimal" if bottleneck == "None" else "Upgrade Recommended",
+                            "overall_score": overall_score  # <--- Send it to React
+            }
         }
     }
