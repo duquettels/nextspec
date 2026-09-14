@@ -17,11 +17,13 @@ app.add_middleware(
 # --- MOCK DATABASE ---
 MOCK_DB = {
     # Using your specific PC specs for baseline testing
-    "12th Gen Intel(R) Core(TM) i7-12700K": {"raw_score": 34000, "type": "cpu"},
-    "NVIDIA GeForce RTX 4070": {"raw_score": 27000, "type": "gpu"},
+    "12th Gen Intel(R) Core(TM) i7-12700K": {"raw_score": 34000, "type": "cpu", "tdp": 125},
+    "NVIDIA GeForce RTX 4070": {"raw_score": 20000, "type": "gpu", "tdp": 200},
+    "12th Gen Intel(R) Core(TM) i7-1260p": {"raw_score": 30000, "type": "cpu", "tdp": 125},
+    "Intel(R) Iris(R) Xe Graphics": {"raw_score": 2000, "type": "gpu", "tdp": 15},
     # Fallback/Test parts to force a bottleneck alert
-    "Intel Core i3-8100": {"raw_score": 6000, "type": "cpu"},
-    "NVIDIA GTX 1060": {"raw_score": 10000, "type": "gpu"}
+    "Intel Core i3-8100": {"raw_score": 6000, "type": "cpu", "tdp": 65},
+    "NVIDIA GTX 1060": {"raw_score": 10000, "type": "gpu", "tdp": 120}
 }
 
 SCORE_MIN = 2000
@@ -43,11 +45,15 @@ class ComponentDetail(BaseModel):
 class AnalysisDetail(BaseModel):
     bottleneck_detected: str
     system_status: str
+    overall_score: int
+    insight_text: str
+
 class HardwareProfile(BaseModel):
     cpu: ComponentDetail
     gpu: ComponentDetail
     ram_gb: int
     storage_gb: int
+    psu: str                 
     analysis: AnalysisDetail
 
 class ScanResponse(BaseModel):
@@ -69,15 +75,30 @@ def run_diagnostic_scan():
     scanned_cpu = hardware.get("cpu", "Unknown CPU")
     scanned_gpu = hardware.get("gpu", "Unknown GPU")
     scanned_ram = hardware.get("ram_gb", 0)
+
+    #DEMO STUFF
     scanned_storage = hardware.get("storage_gb", 0)
+    scanned_psu = "800W Corsair RM800x 80+ Gold"
     
     #Retrieve raw scores from the mock database
     cpu_raw_score = MOCK_DB.get(scanned_cpu, {}).get("raw_score", 0)
     gpu_raw_score = MOCK_DB.get(scanned_gpu, {}).get("raw_score", 0)
 
+    # so the math engine still has numbers to calculate the bottleneck UI.
+    if cpu_raw_score == 0:
+        cpu_raw_score = 30000  # Default to a high score
+    if gpu_raw_score == 0:
+        gpu_raw_score = 5000   # Default to a low score to force a bottleneck alert
+
     # Normalize the scores to a 1.0 - 10.0 scale
     cpu_rating = normalize_score(cpu_raw_score)
     gpu_rating = normalize_score(gpu_raw_score)
+
+    # TDP estimation logic (simplified for demo purposes)
+    cpu_tdp = MOCK_DB.get(scanned_cpu, {}).get("tdp", 65)  
+    gpu_tdp = MOCK_DB.get(scanned_gpu, {}).get("tdp", 150) 
+    estimated_watts = int((cpu_tdp + gpu_tdp + 50) * 1.2)
+    scanned_psu = f"Estimated Required: {estimated_watts}W"
 
     # Bottleneck detection logic
     bottleneck = "None"
@@ -87,6 +108,18 @@ def run_diagnostic_scan():
         else:
             bottleneck = "GPU"
 
+    # Overall system score is the average of CPU and GPU ratings
+    overall_score = int((cpu_rating + gpu_rating) / 2 * 10)  # Scale to 0-100 for UI display
+
+    # --- UPGRADE ADVICE LOGIC ---
+    # This is a placeholder for future logic that could provide upgrade recommendations
+    if bottleneck == "GPU":
+        insight = f"Your CPU is severely outpacing your graphics card. Upgrading your GPU is recommended, but a stronger GPU means you will likely need a PSU larger than your current {estimated_watts}W requirement."
+    elif bottleneck == "CPU":
+        insight = "Your GPU is being bottlenecked by your processor. Upgrading your CPU will unlock missing performance, and usually doesn't require a major PSU wattage jump."
+    else:
+        insight = f"Your system is perfectly balanced. If you plan to upgrade to next-gen components in the future, remember your baseline power requirement will exceed {estimated_watts}W."
+
     return {
         "success": True,
         "message": "Local hardware successfully scanned and analyzed.",
@@ -95,7 +128,12 @@ def run_diagnostic_scan():
             "gpu": {"name": scanned_gpu, "score": gpu_rating},
             "ram_gb": scanned_ram,
             "storage_gb": scanned_storage,
-            "analysis": {"bottleneck_detected": bottleneck, 
-                         "system_status": "Optimal" if bottleneck == "None" else "Upgrade Recommended"}
+            "psu": scanned_psu,
+            "analysis": {
+                "bottleneck_detected": bottleneck, 
+                "system_status": "Optimal" if bottleneck == "None" else "Upgrade Recommended",
+                "overall_score": overall_score,  # <--- Send it to React
+                "insight_text": insight
+            }
         }
     }

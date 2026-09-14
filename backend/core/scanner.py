@@ -40,4 +40,5 @@ if __name__ == "__main__":
     print(f"Detected CPU: {results['cpu']}")
     print(f"Detected GPU: {results['gpu']}")
     print(f"Detected RAM: {results['ram_gb']} GB")
+    print(f"Detected Storage: {results['storage_gb']} GB")
     print("-----------------------------------")

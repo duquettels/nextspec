@@ -197,7 +197,7 @@ body {
 .gain { color: var(--good); }
 
 .ai-panel { border-left: 3px solid var(--accent-cyan); }
-.ai-text { font-size: 13px; line-height: 1.6; color: var(--text-muted); margin-bottom: 15px; flex: 1; }
+.ai-text { font-size: 14.5px; line-height: 1.7; color: var(--text-main); margin-bottom: 15px; flex: 1;}
 .sources { display: flex; gap: 10px; font-size: 10px; margin-top: auto; }
 .source-tag { background: rgba(255, 255, 255, 0.05); padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border); color: var(--text-main); }
 
