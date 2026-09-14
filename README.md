@@ -51,3 +51,18 @@ http://localhost:8000/docs
 ```
 
 This will load the interactive Swagger UI where you can view the exact JSON payload structure and test the /api/scan endpoint.
+
+### 3. Start the Frontend Model
+
+Once the backend server is running, we can run the frontend.
+
+```bash
+npm install
+```
+
+After that is installed, we can then:
+```bash
+npm run dev
+```
+
+Once that is complete, you can then hit CTRL + click on the localhost url!
