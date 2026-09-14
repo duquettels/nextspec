@@ -15,6 +15,7 @@ JSON Formatting: Ensure all pricing scripts return clean, standardized JSON payl
 Backend & Architecture (Levi)
 
 New Route: Create a new FastAPI endpoint (e.g., /api/pricing) that accepts the WMI hardware strings and triggers the external pricing scripts.
+    Another Route: Build a new FastAPI route (e.g., GET /api/game/{game_name}) inside main.py
 Model Updates: Update the HardwareProfile Pydantic model in main.py to securely handle and validate the new pricing objects.
 Data Binding: Expand the App.jsx fetch logic to cleanly pass the new pricing data down into the <Dashboard/> component alongside the existing telemetry.
 The AI Recommendation Engine - Right now, bottleneck logic is a hardcoded if/else statement based on TDP and raw scores. Need to replace this with actual AI or an advanced algorithmic model.  
