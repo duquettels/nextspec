@@ -1,22 +1,4 @@
-import { useEffect, useState } from "react";
-import {fetchScannedData} from '../api/api.js';
-
-
-export default function Dashboard() {
-    const [scannedData, setScannedData] = useState(null);
-
-    useEffect(() => {
-    async function loadScannedData() {
-        try {
-            const data = await fetchScannedData();
-            setScannedData(data.data);
-        } catch (error) {
-            console.error("Error fetching scanned data:", error);
-        }
-    }
-
-    loadScannedData();
-}, []);
+export default function Dashboard({ scannedData }) {
 
     return (
         <div className="dashboard-wrapper">
@@ -32,7 +14,7 @@ export default function Dashboard() {
                   <span className="sys-label">CPU</span>
                   <span className="sys-val">
                     <span className="dot good" />
-                    {scannedData?.cpu}
+                    {scannedData?.cpu?.name || scannedData?.cpu || "Unknown CPU"}
                   </span>
                 </div>
 
@@ -40,7 +22,7 @@ export default function Dashboard() {
                   <span className="sys-label">GPU</span>
                   <span className="sys-val">
                     <span className="dot good" />
-                    {scannedData?.gpu}
+                    {scannedData?.gpu?.name || scannedData?.gpu || "Unknown GPU"}
                   </span>
                 </div>
 
@@ -48,7 +30,7 @@ export default function Dashboard() {
                   <span className="sys-label">RAM</span>
                   <span className="sys-val">
                     <span className="dot good" />
-                    32GB Kingston DDR5 6000Mhz
+                    {scannedData?.ram_gb ? `${scannedData.ram_gb} GB` : "Unknown RAM"}
                   </span>
                 </div>
 
@@ -56,7 +38,7 @@ export default function Dashboard() {
                   <span className="sys-label">Storage</span>
                   <span className="sys-val">
                     <span className="dot good" />
-                    1TB Samsung 990 Pro NVMe SSD
+                    {scannedData?.storage_gb ? `${scannedData.storage_gb} GB` : "Unknown Storage"}
                   </span>
                 </div>
 
@@ -64,7 +46,7 @@ export default function Dashboard() {
                   <span className="sys-label">PSU</span>
                   <span className="sys-val">
                     <span className="dot warn" />
-                    800W Corsair RM800x 80+ Gold
+                    {scannedData?.psu || "Unknown PSU"}
                   </span>
                 </div>
               </div>
@@ -72,8 +54,8 @@ export default function Dashboard() {
               <div className="panel">
                 <div className="panel-title">Performance Overview</div>
                 <div className="perf-circle">
-                  <span>88</span>
-                  <small>/ 100 EXCELLENT</small>
+                  <span>{scannedData?.analysis?.overall_score || "--"}</span>
+                  <small>/ 100 {scannedData?.analysis?.system_status?.toUpperCase() || "UNKNOWN"}</small>
                 </div>
               </div>
 
@@ -138,8 +120,7 @@ export default function Dashboard() {
             <div className="panel ai-panel">
               <div className="panel-title">AI Insight</div>
               <div className="ai-text">
-                Your i7 and RTX 4070 provide exceptional 1440p framerates. To maximize future upgrade paths
-                for next-gen GPUs, replacing your 800W PSU is the most strategic priority.
+                {scannedData?.analysis?.insight_text || "No AI insight available."}
               </div>
               <div className="sources">
                 <div className="source-tag">Amazon</div>
