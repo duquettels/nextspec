@@ -18,7 +18,9 @@ app.add_middleware(
 MOCK_DB = {
     # Using your specific PC specs for baseline testing
     "12th Gen Intel(R) Core(TM) i7-12700K": {"raw_score": 34000, "type": "cpu", "tdp": 125},
-    "NVIDIA GeForce RTX 4070": {"raw_score": 5000, "type": "gpu", "tdp": 200},
+    "NVIDIA GeForce RTX 4070": {"raw_score": 20000, "type": "gpu", "tdp": 200},
+    "12th Gen Intel(R) Core(TM) i7-1260p": {"raw_score": 30000, "type": "cpu", "tdp": 125},
+    "Intel(R) Iris(R) Xe Graphics": {"raw_score": 2000, "type": "gpu", "tdp": 15},
     # Fallback/Test parts to force a bottleneck alert
     "Intel Core i3-8100": {"raw_score": 6000, "type": "cpu", "tdp": 65},
     "NVIDIA GTX 1060": {"raw_score": 10000, "type": "gpu", "tdp": 120}
