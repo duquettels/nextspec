@@ -7,7 +7,7 @@ export default function Dashboard({ scannedData }) {
               <div className="panel">
                 <div className="panel-title">
                   <span>System Summary</span>
-                  <span>↻ 10:42 AM</span>
+                  <span>↻ LIVE </span>
                 </div>
 
                 <div className="sys-item">
