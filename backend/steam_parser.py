@@ -88,6 +88,16 @@ def search_game_by_name(game_name: str):
         print(f"Search error: {e}")
         return None, None
 
+
+def fetch_steam_specs_by_name(game_name: str):
+    """Wrapper function for the FastAPI backend."""
+    app_id, official_name = search_game_by_name(game_name)
+    
+    if app_id:
+        return get_game_requirements(app_id)
+    return {"error": f"Could not find a Steam game matching '{game_name}'."}
+
+
 # --- Test the Script ---\
 if __name__ == "__main__":
     # Let the user type a name instead of an ID

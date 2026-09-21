@@ -1,9 +1,17 @@
+import os
+from dotenv import load_dotenv
+from google import genai
+from pydantic import BaseModel
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 from core.scanner import get_local_hardware
+from steam_parser import fetch_steam_specs_by_name
 
 app = FastAPI(title="NextSpec API", version="1.0")
+
+load_dotenv()
+api_key = os.getenv("GEMINI_API_KEY")
+ai_client = genai.Client(api_key=api_key)
 
 # --- CORS CONFIGURATION ---
 app.add_middleware(
@@ -41,6 +49,8 @@ def normalize_score(raw_score: int) -> float:
 class ComponentDetail(BaseModel):
     name: str
     score: float
+    current_value_usd: float = 0.0  # Ready for eBay data
+    upgrade_msrp_usd: float = 0.0   # Ready for Best Buy data
 
 class AnalysisDetail(BaseModel):
     bottleneck_detected: str
@@ -60,6 +70,13 @@ class ScanResponse(BaseModel):
     success: bool
     message: str
     data: HardwareProfile
+
+class ConsultationRequest(BaseModel):
+    budget: int
+    target_fps: int
+    target_resolution: str
+    current_bottleneck: str
+    game_name: str
     
 # --- ROUTES ---
 @app.get("/")
@@ -137,3 +154,44 @@ def run_diagnostic_scan():
             }
         }
     }
+
+@app.post("/api/consultation")
+def calculate_dynamic_upgrade(budget: int, target_resolution: str, target_fps: int):
+    """
+    Placeholder: Will ingest UI slider data and recalculate component recommendations on the fly.
+    """
+    return {"status": "Route active", "budget_received": budget}
+
+@app.get("/api/game/{game_name}")
+def get_game_requirements_endpoint(game_name: str):
+    """
+    Fetches the minimum and recommended specs for a given game from Steam.
+    """
+    specs = fetch_steam_specs_by_name(game_name)
+    
+    if "error" in specs:
+         return {"success": False, "message": specs["error"]}
+         
+    return {"success": True, "data": specs}
+
+@app.post("/api/advisor")
+def get_ai_hardware_advice(request: ConsultationRequest):
+    """
+    Takes user constraints from the frontend and generates a dynamic AI hardware recommendation.
+    """
+    prompt = f"""
+    You are a PC hardware expert. My current system bottleneck is the {request.current_bottleneck}.
+    I want to play {request.game_name} at {request.target_resolution} targeting {request.target_fps} FPS.
+    With a budget of ${request.budget}, recommend exactly ONE component upgrade that fixes this bottleneck. 
+    Keep your response to two brief, professional sentences.
+    """
+    
+    try:
+        # Using the model that just successfully cleared the queue
+        response = ai_client.models.generate_content(
+            model='gemini-flash-latest',
+            contents=prompt
+        )
+        return {"success": True, "ai_insight": response.text}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
