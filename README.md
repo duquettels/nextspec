@@ -24,7 +24,7 @@
 
 Currently, NextSpec is in the Milestone 1 development phase. To run the backend diagnostic API locally, follow these steps:
 
-### 1. Start the Backend (FastAPI)
+### 1. Start the Backend (FastAPI) MAC VERSION
 
 You must navigate into the `backend` folder before starting the Uvicorn server, or the application will fail to import the scanner modules.
 
@@ -35,7 +35,10 @@ git clone [https://github.com/YOUR-ORG/nextspec.git](https://github.com/YOUR-ORG
 # Navigate into the backend directory
 cd nextspec/backend
 
-# Install dependencies
+#activate the .env for a virtual environment
+source .venv/bin/activate
+
+# Install dependencies (only needed once?)
 pip install fastapi uvicorn pydantic wmi
 
 # Run the local server

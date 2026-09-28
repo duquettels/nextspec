@@ -1,12 +1,21 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import {BrowserRouter} from 'react-router-dom';
 import App from './App.jsx';
-import sidebar from './components/Sidebar.jsx';
-import "./global.css";
+import "./styles/global.css";
+import "./styles/layout.css";
+import "./styles/panels.css";
+import "./styles/dashboard.css";
+
+
+
+
 
 //this will be my main entry point for App.jsx
 createRoot(document.getElementById('root')).render(
     <StrictMode>
-        <App />
+     <BrowserRouter>
+     <App />
+     </BrowserRouter>
     </StrictMode>
 )
