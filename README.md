@@ -36,7 +36,7 @@ git clone [https://github.com/YOUR-ORG/nextspec.git](https://github.com/YOUR-ORG
 cd nextspec/backend
 
 # Install dependencies
-pip install fastapi uvicorn pydantic wmi
+python -m pip install -r requirements.txt
 
 # Run the local server
 python -m uvicorn main:app --reload
