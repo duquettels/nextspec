@@ -25,9 +25,6 @@ GPU_EXCLUDE_TERMS = [
     "frame", "support", "holder", "stand",
 ]
  
-# Real graphics card listings almost always state their VRAM size (e.g. "24GB",
-# "10 GB"); accessories essentially never do. Requiring this pattern catches
-# accessory listings that slip past the keyword exclusions above.
 GPU_REQUIRE_PATTERN = r"\d+\s?gb"
 CPU_EXCLUDE_TERMS = [
     "cooler", "heatsink", "bracket", "socket", "replacement", "repair",
