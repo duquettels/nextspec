@@ -17,6 +17,7 @@ def get_game_requirements(app_id: int):
 
         game_data = data[str(app_id)]["data"]
         game_name = game_data.get("name", "Unknown Game")
+        header_image = game_data.get("header_image", "")
         pc_requirements = game_data.get("pc_requirements", {})
 
         # Extract raw HTML strings
@@ -25,6 +26,7 @@ def get_game_requirements(app_id: int):
 
         return {
             "game_name": game_name,
+            "header_image": header_image,
             "minimum": extract_hardware_strings(min_html),
             "recommended": extract_hardware_strings(rec_html)
         }
