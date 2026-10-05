@@ -1,0 +1,4 @@
+DATABASE_URL = postgresql://neondb_owner:npg_QGF16DpWBKPM@ep-empty-fog-ayanzyuy-pooler.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+EBAY_CLIENT_ID=DylanPao-Gpu-PRD-2fb79df06-2ef0161f
+EBAY_CLIENT_SECRET=PRD-fb79df060e34-6d77-4b1e-8d3d-14c1
+EBAY_ENV=https://api.ebay.com
