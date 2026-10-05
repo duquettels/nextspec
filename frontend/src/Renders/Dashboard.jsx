@@ -7,8 +7,44 @@ export default function Dashboard({ scannedData }) {
   const [fps, setFPS] = useState(60);
   const [resolution, setResolution] = useState("1080p");
 
+  const [aiInsight, setAiInsight] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+
+  useEffect(() => {
+    if (scannedData?.analysis?.insight_text) {
+      setAiInsight(scannedData.analysis.insight_text);
+    }
+  }, [scannedData]);
+
   //boolean to control ui render
   const isGaming = purpose.includes("Gaming");
+
+  async function handleUpdateAI() {
+    setAiLoading(true);
+    try {
+      const response = await fetch("http://localhost:8000/api/advisor", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          budget: parseInt(budget),
+          purpose: purpose,
+          current_bottleneck: scannedData?.analysis?.bottleneck_detected || "Unknown",
+          target_fps: isGaming ? parseInt(fps) : null,
+          target_resolution: isGaming ? resolution : null
+        })
+      });
+      const result = await response.json();
+      if (result.success) {
+        setAiInsight(result.insight);
+      } else {
+        setAiInsight("AI Error: " + result.error);
+      }
+      } catch (err) {
+        setAiInsight("Error fetching AI insight.");
+      } finally {
+        setAiLoading(false);
+      }
+    }
 
     return (
       <div className="dashboard-wrapper">
@@ -83,6 +119,18 @@ export default function Dashboard({ scannedData }) {
                       style={{ width: "100%" }}
                   />
               </div>
+
+              <button
+                onClick={handleUpdateAI}
+                disabled={aiLoading}
+                style={{
+                  width: "100%", padding: "10px",
+                  background: "var(--accent-cyan)", color: "#fff",
+                  border: "none", borderRadius: "6px", fontWeight: "600",
+                }}
+              >
+                {aiLoading ? "Generating Insight..." : "Ask AI for Upgrade Advice"}
+              </button>
             </div>
 
             <div className="panel">
@@ -146,7 +194,7 @@ export default function Dashboard({ scannedData }) {
             <div className="panel ai-panel">
               <div className="panel-title">AI Insight</div>
               <div className="ai-text">
-                {scannedData?.analysis?.insight_text || "No AI insight available."}
+                {aiInsight || "No AI insight available."}
               </div>
               <div className="sources">
                 <div className="source-tag">Amazon</div>
