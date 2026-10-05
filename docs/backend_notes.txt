@@ -1,1 +1,4 @@
-- Graphics, Performance, etc: 
+- update WMI scanner to pull part number
+- update ebay scanner to get part number
+- add conversational ai to ai upgrade advisor
+- 3d model -> help where needed
