@@ -25,6 +25,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  text-decoration: none;
 }
 
 .nav-item {
@@ -32,11 +33,13 @@
   color: var(--text-muted);
   font-size: 13px;
   letter-spacing: 0.5px;
+  font-weight: 500;
   transition: all 0.2s ease;
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 12px;
+  text-decoration: none;
 }
 
 .nav-item:hover {
@@ -97,4 +100,9 @@
   .hardware-info-panel {
     width: 100%;
   }
+}
+
+.main > .panel:not(.hardware-info-panel) {
+  width: min(100%, 900px);
+  margin-inline: auto;
 }

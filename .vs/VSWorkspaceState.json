@@ -1,0 +1,16 @@
+{
+  "ExpandedNodes": [
+    "",
+    "\\backend",
+    "\\database",
+    "\\docs",
+    "\\frontend",
+    "\\frontend\\public",
+    "\\frontend\\src",
+    "\\frontend\\src\\api",
+    "\\frontend\\src\\components",
+    "\\frontend\\src\\Renders"
+  ],
+  "SelectedNode": "\\frontend\\src\\Renders\\Dashboard.jsx",
+  "PreviewInSolutionExplorer": false
+}

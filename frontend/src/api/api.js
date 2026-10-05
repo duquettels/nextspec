@@ -10,3 +10,20 @@ export async function fetchScannedData() {
     if(!res.ok) throw new Error('Failed to fetch data from the Database');
     return res.json();
 }
+
+export async function fetchGameRequirements(gameName) {
+    const encodedGameName = encodeURIComponent(gameName);
+
+    const response = await fetch(`${BASE}/api/game/${encodedGameName}`
+
+    );
+
+    const result = await response.json();
+
+
+    if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Failed to fetch game requirements');
+    }
+
+    return result.data;
+}

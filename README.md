@@ -14,11 +14,10 @@
 * `/database` - SQL schemas for Neon PostgreSQL.
 * `/docs` - System diagrams and UI prototypes.
 
-### Current Status: Sprint 1 (Environment Setup)
-
-* Repository scaffolded and team access granted.
-* UI Digital Prototype completed.
-* WMI diagnostic proof-of-concept in development.
+### Architecture (MVC)
+* **View (Frontend):** React & React Three Fiber (R3F) for interactive 3D rendering and dashboard UI.
+* **Controller (API Gateway):** FastAPI coordinates the local WMI hardware scan, web scraping, and AI prompt injection.
+* **Model (Data Layer):** Neon PostgreSQL (integration in progress) and live web APIs (Steam, Gemini, eBay).
 
 ## 🛠️ Local Development Setup
 
