@@ -10,11 +10,6 @@ export default function Dashboard({ scannedData }) {
   const [aiInsight, setAiInsight] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
 
-  useEffect(() => {
-    if (scannedData?.analysis?.insight_text) {
-      setAiInsight(scannedData.analysis.insight_text);
-    }
-  }, [scannedData]);
 
   //boolean to control ui render
   const isGaming = purpose.includes("Gaming");
