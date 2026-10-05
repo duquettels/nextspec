@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
+import { fetchScannedData } from "./api/api";
 
 import Sidebar from "./components/Sidebar";
 import RealTimeClock from "./components/RealTimeClock";
@@ -12,16 +13,16 @@ import GameOptimizer from "./Renders/GameOptimizer";
 import AIUpgradeAdvisor from "./Renders/AIUpgradeAdvisor";
 
 
+
+
 export default function App() {
   const [hardware, setHardware] = useState(null);
   const [loading, setLoading] = useState(true);
 
 
   useEffect(() => {
-    // Simulate an API call to fetch hardware data
-    fetch("http://localhost:8000/api/scan")
-      // Replace this with your actual API call
-      .then((response) => response.json())
+    // Use the clean API function instead of raw fetch
+    fetchScannedData()
       .then(json => {
         setHardware(json.data);
         setLoading(false);
