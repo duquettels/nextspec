@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv
 from google import genai
 from pydantic import BaseModel
+from typing import Optional, List
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from core.scanner import get_local_hardware
@@ -73,10 +74,13 @@ class ScanResponse(BaseModel):
 
 class ConsultationRequest(BaseModel):
     budget: int
-    target_fps: int
-    target_resolution: str
+    purpose: str
     current_bottleneck: str
-    game_name: str
+    target_fps: Optional[int] = None
+    target_resolution: Optional[str] = None
+    target_game: Optional[str] = None
+    game_requirements: Optional[str] = None
+
     
 # --- ROUTES ---
 @app.get("/")
@@ -97,17 +101,14 @@ def run_diagnostic_scan():
     scanned_storage = hardware.get("storage_gb", 0)
     scanned_psu = "800W Corsair RM800x 80+ Gold"
     
-    #Retrieve raw scores from the mock database
-    cpu_raw_score = MOCK_DB.get(scanned_cpu, {}).get("raw_score", 0)
-    gpu_raw_score = MOCK_DB.get(scanned_gpu, {}).get("raw_score", 0)
+   # 1. Retrieve raw scores from the mock database with smart fallbacks
+    cpu_data = MOCK_DB.get(scanned_cpu, {"raw_score": 25000})
+    gpu_data = MOCK_DB.get(scanned_gpu, {"raw_score": 20000})
+    
+    cpu_raw_score = cpu_data.get("raw_score", 25000)
+    gpu_raw_score = gpu_data.get("raw_score", 20000)
 
-    # so the math engine still has numbers to calculate the bottleneck UI.
-    if cpu_raw_score == 0:
-        cpu_raw_score = 30000  # Default to a high score
-    if gpu_raw_score == 0:
-        gpu_raw_score = 5000   # Default to a low score to force a bottleneck alert
-
-    # Normalize the scores to a 1.0 - 10.0 scale
+    # 2. Normalize to 1.0 - 10.0 scale
     cpu_rating = normalize_score(cpu_raw_score)
     gpu_rating = normalize_score(gpu_raw_score)
 
@@ -119,7 +120,8 @@ def run_diagnostic_scan():
 
     # Bottleneck detection logic
     bottleneck = "None"
-    if abs(gpu_rating - cpu_rating) > 2.5: #2.5 point threshold for bottleneck detection
+    score_diff = abs(gpu_rating - cpu_rating)
+    if score_diff > 1.5:  # Lower threshold so it triggers more reliably for demos
         if cpu_rating < gpu_rating:
             bottleneck = "CPU"
         else:
@@ -175,6 +177,7 @@ HARDWARE_CATALOG = [
     {"type": "ram", "name": "Corsair Vengeance 32GB DDR4", "price": 65, "performance_boost": "+30%"}
 ]
 
+
 @app.get("/api/quick-upgrades")
 def get_quick_upgrades(budget: int, bottleneck: str):
     """
@@ -192,53 +195,48 @@ def get_quick_upgrades(budget: int, bottleneck: str):
     sorted_parts = sorted(matching_parts, key=lambda x: x["price"], reverse=True)
     return {"success": True, "budget": budget, "recommendations": sorted_parts[:3]}
 
+
 # AI ADVISOR ---
 @app.post("/api/advisor")
 def get_ai_hardware_advice(request: ConsultationRequest):
-    """
-    Scrapes Steam and generates a dynamic AI hardware recommendation.
-    """
-    # 1. Fetch live Steam requirements using your imported function
-    steam_data = fetch_steam_specs_by_name(request.game_name)
-    
-    if "error" in steam_data:
-        return {"success": False, "message": steam_data["error"]}
+    # Base prompt
+    prompt_context = f"I am upgrading my PC primarily for: {request.purpose}."
 
-    # 2. Extract the minimum GPU from the Steam data
-    min_specs = steam_data.get("minimum", {})
-    if isinstance(min_specs, dict):
-        steam_gpu = min_specs.get("graphics", "Unknown GPU")
-    else:
-        steam_gpu = "Unknown GPU"
+    # Conditionally add target FPS and resolution if provided
+    if request.target_fps and request.target_resolution:
+        prompt_context += f" I want to achieve {request.target_fps} FPS at {request.target_resolution} resolution."
+
+    # Steam condition
+    if request.target_game and request.game_requirements:
+        prompt_context += f" The game I want to play is {request.target_game}, which has the following requirements: {request.game_requirements}."
     
-    # 3. Inject it into the Gemini Prompt
+    # Inject it into the Gemini Prompt
     prompt = f"""
     You are NextSpec AI, a PC hardware assistant. My system bottleneck is the {request.current_bottleneck}.
-    I want to play {steam_data.get('game_name')}, which requires at least a {steam_gpu}.
-    With a budget of ${request.budget}, recommend exactly ONE component upgrade that fixes this bottleneck and meets the game's requirements. 
-    Keep your response to two brief, professional sentences.
+    {prompt_context}
+    With a budget of ${request.budget}, recommend exactly ONE component upgrade that fixes this bottleneck.
+    Keep your response to two brief, professional sentences. Do not use markdown formatting.
     """
     
     try:
-        # 4. Ask Gemini
+        # Ask Gemini
         response = ai_client.models.generate_content(
-            model='gemini-flash-latest',
+            model='gemini-3.8-flash',
             contents=prompt
         )
         ai_text = response.text
 
     except Exception as e:
         error_msg = str(e)
-        # 4b. The Presentation Safety Net: Catch server traffic jams
+        # The Presentation Safety Net: Catch server traffic jams
         if "503" in error_msg or "high demand" in error_msg.lower():
-            ai_text = f"Due to current system constraints, I am operating in offline mode. To play {request.game_name}, which requires a {steam_gpu}, I recommend dedicating your ${request.budget} budget to the strongest GPU available in the catalog."
+            game_target = request.target_game if request.target_game else "your target workloads"
+            ai_text = f"Due to current network constraints, I am operating in offline mode. To hit your goals for {game_target}, I recommend dedicating your ${request.budget} budget to the strongest {request.current_bottleneck} available in our catalog."
         else:
             return {"success": False, "error": error_msg}
 
-    # 5. Return the Master JSON Payload (now includes the header_image you added!)
+    # Return the Master JSON Payload (now includes the header_image you added!)
     return {
         "success": True, 
-        "game_scraped": steam_data.get("game_name"),
-        "steam_requirements": steam_data,
         "ai_insight": ai_text
     }
