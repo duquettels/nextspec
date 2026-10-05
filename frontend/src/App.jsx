@@ -1,21 +1,20 @@
 import { useState, useEffect } from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
+
 import Sidebar from "./components/Sidebar";
 import RealTimeClock from "./components/RealTimeClock";
-import Dashboard from "./Renders/Dashboard";
 import HardwareInfo from "./components/HardwareInfo";
 
+import Dashboard from "./Renders/Dashboard";
+import ThreeDBuilder from "./Renders/ThreeDBuilder";
+import PriceChecker from "./Renders/PriceChecker";
+import GameOptimizer from "./Renders/GameOptimizer";
+import AIUpgradeAdvisor from "./Renders/AIUpgradeAdvisor";
 
-//VVV To be imported once they are ready to be used and rendered in the app. VVV
-
-//import threeDBuilder from "./Renders/threeDBuilder";
-//import PriceChecker from "./Renders/PriceChecker";
-//import GameOptimizer from "./Renders/GameOptimizer";
-//import AIUpgradeAdvisor from "./Renders/AIUpgradeAdvisor";
 
 export default function App() {
   const [hardware, setHardware] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("dashboard");
 
 
   useEffect(() => {
@@ -32,9 +31,6 @@ export default function App() {
         setLoading(false);
       });
   }, []);
-
-
-
 
   if (loading) {
     return (
@@ -66,11 +62,22 @@ export default function App() {
         <HardwareInfo scannedData={hardware} />
 
         <Routes>
-          <Route path="/Dashboard" element={<Dashboard scannedData={hardware} />} />
-          <Route path="/3DBuilder" element={<threeDBuilder scannedData={hardware} />} />
-          <Route path="/PriceChecker" element={<PriceChecker scannedData={hardware} />} />
-          <Route path="/GameOptimizer" element={<GameOptimizer scannedData={hardware} />} />
-          <Route path="/AIUpgradeAdvisor" element={<AIUpgradeAdvisor scannedData={hardware} />} />
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+
+          <Route path ="/dashboard" element={<Dashboard scannedData={hardware} />}
+           />
+
+          <Route path="/3d-builder" element={<ThreeDBuilder scannedData={hardware} />}
+           />
+          <Route path="/price-checker" element={<PriceChecker scannedData={hardware} />}
+           />
+          <Route path="/game-optimizer" element={<GameOptimizer scannedData={hardware} />}
+           />
+          <Route path="/ai-upgrade-advisor" element={<AIUpgradeAdvisor scannedData={hardware}
+           />} />
+
+
+          
         </Routes>
 
 

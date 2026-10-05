@@ -2,40 +2,49 @@ import { NavLink } from "react-router-dom";
 
 
 export default function Sidebar() {
+
+    const getNavClass = ({ isActive }) =>
+        `nav-item${isActive ? " active" : ""}`;
+
     return (
 
         //ugly chain of navLinks.
         <nav>
-            <NavLink 
-                to="/Dashboard" className="brand" activeClassName="active">⬡ NEXTSPEC
-                </NavLink>
-
-            <NavLink 
-                to="/Dashboard" className="nav-item" activeClassName="active">Dashboard
-            </NavLink >
-
             <NavLink
-                to="/threeDBuilder" className="nav-item" activeClassName="active">3DBuilder
+                to="/dashboard"
+                className={({ isActive }) =>
+                    `brand${isActive ? " active" : ""}`
+                }
+            >
+                ⬡ NEXTSPEC
             </NavLink>
 
-            <NavLink
-                to="/GameOptimizer" className="nav-item" activeClassName="active">Optimizer
+            <NavLink to="/dashboard" className={getNavClass}>
+                Dashboard
             </NavLink>
 
-            <NavLink
-                to="/AIUpgradeAdvisor" className="nav-item" activeClassName="active">Upgrade Advisor
+            <NavLink to="/3d-builder" className={getNavClass}>
+                3D Builder
             </NavLink>
 
-            <NavLink
-                to="/PriceChecker" className="nav-item" activeClassName="active">Price Checker
+            <NavLink to="/game-optimizer" className={getNavClass}>
+                Optimizer
+            </NavLink>
+
+            <NavLink to="/ai-upgrade-advisor" className={getNavClass}>
+                Upgrade Advisor
+            </NavLink>
+
+            <NavLink to="/price-checker" className={getNavClass}>
+                Price Checker
             </NavLink>
         </nav>
 
 
 
-        
+
         // <div className="sidebar">
-            
+
         //     <div className="brand">⬡ NEXTSPEC</div>
 
         //     <div className="nav-item active">Dashboard</div>
