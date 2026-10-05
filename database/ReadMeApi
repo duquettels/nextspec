@@ -8,7 +8,7 @@ DATABASE_URL=postgresql://user:password@ep-xxxx.aws.neon.tech/dbname?sslmode=req
 
 Look Up price Directly:
 py ebay_api.py cpu "cpu name"
-py ebay_api.py gpu "gpu naem"
+py ebay_api.py gpu "gpu name"
 
 Remove live pricing for gpu: UPDATE gpu_benchmarks SET live_price = NULL, price_updated_at = NULL WHERE gpu_name = 'gpu name';
 Remove live pricing for cpu: UPDATE cpu_benchmarks SET live_price = NULL, price_updated_at = NULL WHERE cpu_name = 'cpu name';
