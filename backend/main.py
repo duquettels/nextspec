@@ -1,9 +1,17 @@
+import os
+from dotenv import load_dotenv
+from google import genai
+from pydantic import BaseModel
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 from core.scanner import get_local_hardware
+from steam_parser import fetch_steam_specs_by_name
 
 app = FastAPI(title="NextSpec API", version="1.0")
+
+load_dotenv()
+api_key = os.getenv("GEMINI_API_KEY")
+ai_client = genai.Client(api_key=api_key)
 
 # --- CORS CONFIGURATION ---
 app.add_middleware(
@@ -18,7 +26,7 @@ app.add_middleware(
 MOCK_DB = {
     # Using your specific PC specs for baseline testing
     "12th Gen Intel(R) Core(TM) i7-12700K": {"raw_score": 34000, "type": "cpu", "tdp": 125},
-    "NVIDIA GeForce RTX 4070": {"raw_score": 20000, "type": "gpu", "tdp": 200},
+    "NVIDIA GeForce RTX 4070": {"raw_score": 30000, "type": "gpu", "tdp": 200},
     "12th Gen Intel(R) Core(TM) i7-1260p": {"raw_score": 30000, "type": "cpu", "tdp": 125},
     "Intel(R) Iris(R) Xe Graphics": {"raw_score": 2000, "type": "gpu", "tdp": 15},
     # Fallback/Test parts to force a bottleneck alert
@@ -41,6 +49,8 @@ def normalize_score(raw_score: int) -> float:
 class ComponentDetail(BaseModel):
     name: str
     score: float
+    current_value_usd: float = 0.0  # Ready for eBay data
+    upgrade_msrp_usd: float = 0.0   # Ready for Best Buy data
 
 class AnalysisDetail(BaseModel):
     bottleneck_detected: str
@@ -60,6 +70,13 @@ class ScanResponse(BaseModel):
     success: bool
     message: str
     data: HardwareProfile
+
+class ConsultationRequest(BaseModel):
+    budget: int
+    target_fps: int
+    target_resolution: str
+    current_bottleneck: str
+    game_name: str
     
 # --- ROUTES ---
 @app.get("/")
@@ -136,4 +153,92 @@ def run_diagnostic_scan():
                 "insight_text": insight
             }
         }
+    }
+
+@app.get("/api/game/{game_name}")
+def get_game_requirements_endpoint(game_name: str):
+    """
+    Fetches the minimum and recommended specs for a given game from Steam.
+    """
+    specs = fetch_steam_specs_by_name(game_name)
+    
+    if "error" in specs:
+         return {"success": False, "message": specs["error"]}
+         
+    return {"success": True, "data": specs}
+
+HARDWARE_CATALOG = [
+    {"type": "gpu", "name": "AMD Radeon RX 6600 8GB", "price": 199, "performance_boost": "+65%"},
+    {"type": "gpu", "name": "NVIDIA RTX 4060 8GB", "price": 299, "performance_boost": "+110%"},
+    {"type": "cpu", "name": "Intel Core i5-12600K", "price": 175, "performance_boost": "+80%"},
+    {"type": "cpu", "name": "AMD Ryzen 5 5600X", "price": 145, "performance_boost": "+50%"},
+    {"type": "ram", "name": "Corsair Vengeance 32GB DDR4", "price": 65, "performance_boost": "+30%"}
+]
+
+@app.get("/api/quick-upgrades")
+def get_quick_upgrades(budget: int, bottleneck: str):
+    """
+    Returns candidate components matching the user's budget without requiring a game query.
+    """
+    bottleneck_type = bottleneck.lower()
+    
+    # Filter catalog by bottleneck category and max budget
+    matching_parts = [
+        part for part in HARDWARE_CATALOG 
+        if part["type"] == bottleneck_type and part["price"] <= budget
+    ]
+    
+    # Sort by highest price to show the best options at the top of their budget
+    sorted_parts = sorted(matching_parts, key=lambda x: x["price"], reverse=True)
+    return {"success": True, "budget": budget, "recommendations": sorted_parts[:3]}
+
+# AI ADVISOR ---
+@app.post("/api/advisor")
+def get_ai_hardware_advice(request: ConsultationRequest):
+    """
+    Scrapes Steam and generates a dynamic AI hardware recommendation.
+    """
+    # 1. Fetch live Steam requirements using your imported function
+    steam_data = fetch_steam_specs_by_name(request.game_name)
+    
+    if "error" in steam_data:
+        return {"success": False, "message": steam_data["error"]}
+
+    # 2. Extract the minimum GPU from the Steam data
+    min_specs = steam_data.get("minimum", {})
+    if isinstance(min_specs, dict):
+        steam_gpu = min_specs.get("graphics", "Unknown GPU")
+    else:
+        steam_gpu = "Unknown GPU"
+    
+    # 3. Inject it into the Gemini Prompt
+    prompt = f"""
+    You are NextSpec AI, a PC hardware assistant. My system bottleneck is the {request.current_bottleneck}.
+    I want to play {steam_data.get('game_name')}, which requires at least a {steam_gpu}.
+    With a budget of ${request.budget}, recommend exactly ONE component upgrade that fixes this bottleneck and meets the game's requirements. 
+    Keep your response to two brief, professional sentences.
+    """
+    
+    try:
+        # 4. Ask Gemini
+        response = ai_client.models.generate_content(
+            model='gemini-flash-latest',
+            contents=prompt
+        )
+        ai_text = response.text
+
+    except Exception as e:
+        error_msg = str(e)
+        # 4b. The Presentation Safety Net: Catch server traffic jams
+        if "503" in error_msg or "high demand" in error_msg.lower():
+            ai_text = f"Due to current system constraints, I am operating in offline mode. To play {request.game_name}, which requires a {steam_gpu}, I recommend dedicating your ${request.budget} budget to the strongest GPU available in the catalog."
+        else:
+            return {"success": False, "error": error_msg}
+
+    # 5. Return the Master JSON Payload (now includes the header_image you added!)
+    return {
+        "success": True, 
+        "game_scraped": steam_data.get("game_name"),
+        "steam_requirements": steam_data,
+        "ai_insight": ai_text
     }

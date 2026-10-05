@@ -14,11 +14,10 @@
 * `/database` - SQL schemas for Neon PostgreSQL.
 * `/docs` - System diagrams and UI prototypes.
 
-### Current Status: Sprint 1 (Environment Setup)
-
-* Repository scaffolded and team access granted.
-* UI Digital Prototype completed.
-* WMI diagnostic proof-of-concept in development.
+### Architecture (MVC)
+* **View (Frontend):** React & React Three Fiber (R3F) for interactive 3D rendering and dashboard UI.
+* **Controller (API Gateway):** FastAPI coordinates the local WMI hardware scan, web scraping, and AI prompt injection.
+* **Model (Data Layer):** Neon PostgreSQL (integration in progress) and live web APIs (Steam, Gemini, eBay).
 
 ## 🛠️ Local Development Setup
 
@@ -36,7 +35,14 @@ git clone [https://github.com/YOUR-ORG/nextspec.git](https://github.com/YOUR-ORG
 cd nextspec/backend
 
 # Install dependencies
-pip install fastapi uvicorn pydantic wmi
+python -m pip install -r requirements.txt
+
+# Environment Variables:
+# Create a .env file in the backend root and add your API keys:
+GEMINI_API_KEY=your_google_key
+EBAY_CLIENT_ID=your_ebay_id
+EBAY_CLIENT_SECRET=your_ebay_secret
+DATABASE_URL=your_neon_db_string
 
 # Run the local server
 python -m uvicorn main:app --reload
