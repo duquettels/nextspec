@@ -3,6 +3,7 @@ export default function HardwareInfo({ scannedData }) {
 
   const getDotClass = (component) => {
     return bottleneck === component ? "warn" : "good";
+    
   };
     return (
         <div className="panel hardware-info-panel">
