@@ -27,3 +27,19 @@ export async function fetchGameRequirements(gameName) {
 
     return result.data;
 }
+
+export async function saveLocalProfile(profileData) {
+    const response = await fetch(`${BASE}/api/save_build`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(profileData)
+    });
+
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Failed to save profile locally');
+    }
+    return result;
+}
