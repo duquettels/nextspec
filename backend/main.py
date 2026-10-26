@@ -1,4 +1,5 @@
 import json
+import psycopg2
 import os
 from typing import Optional
 from dotenv import load_dotenv
@@ -25,6 +26,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+
 # --- MOCK DATABASE ---
 MOCK_DB = {
     # Using your specific PC specs for baseline testing
@@ -47,6 +50,34 @@ def normalize_score(raw_score: int) -> float:
         return 0.0
     normalized = ((raw_score - SCORE_MIN) / (SCORE_MAX - SCORE_MIN)) * 10
     return round(max(1.0, min(10.0, normalized)), 1)
+
+# --- DATABASE CONNECTION ---
+def fetch_hardware_data(component_name, hw_type):
+    try:
+        conn = psycopg2.connect(os.getenv("DATABASE_URL"))
+        cur = conn.cursor()
+        
+        # Route query based on component type matching schema.sql
+        if hw_type == "cpu":
+            cur.execute("SELECT cpu_mark, tdp FROM cpu_benchmarks WHERE cpu_name = %s", (component_name,))
+        else:
+            # Querying g3d_name as the integer benchmark score per Paolo's schema
+            cur.execute("SELECT g3d_name, tdp FROM gpu_benchmarks WHERE gpu_name = %s", (component_name,))
+            
+        row = cur.fetchone()
+        conn.close()
+        
+        if row:
+            # Safely cast TDP in case of null values in the database
+            fallback_tdp = 65 if hw_type == "cpu" else 150
+            tdp = float(row[1]) if row[1] is not None else fallback_tdp
+            return {"raw_score": int(row[0]), "type": hw_type, "tdp": tdp}
+            
+    except Exception as e:
+        print(f"Neon DB fallback triggered for {component_name}: {e}")
+        
+    # Seamless fallback to local mock data
+    return MOCK_DB.get(component_name, {})
 
 # --- Local save ---
 SAVE_DIR = "local_saves"
@@ -103,51 +134,35 @@ def read_root():
 # --- DIAGNOSTIC SCAN ROUTE ---
 @app.get("/api/scan", response_model=ScanResponse)
 def run_diagnostic_scan():
-    """
-    Triggers the local WMI scanner, scores the hardware, and checks for bottlenecks.
-    """
     hardware = get_local_hardware()
     scanned_cpu = hardware.get("cpu", "Unknown CPU")
     scanned_gpu = hardware.get("gpu", "Unknown GPU")
     scanned_ram = hardware.get("ram_gb", 0)
-
-    #DEMO STUFF
     scanned_storage = hardware.get("storage_gb", 0)
-    scanned_psu = "800W Corsair RM800x 80+ Gold"
+
+    cpu_data = fetch_hardware_data(scanned_cpu, "cpu")
+    gpu_data = fetch_hardware_data(scanned_gpu, "gpu")
     
-    #Retrieve raw scores from the mock database
-    cpu_raw_score = MOCK_DB.get(scanned_cpu, {}).get("raw_score", 0)
-    gpu_raw_score = MOCK_DB.get(scanned_gpu, {}).get("raw_score", 0)
+    cpu_raw_score = cpu_data.get("raw_score", 30000)
+    gpu_raw_score = gpu_data.get("raw_score", 5000)
+    cpu_tdp = cpu_data.get("tdp", 65)
+    gpu_tdp = gpu_data.get("tdp", 150)
 
-    # so the math engine still has numbers to calculate the bottleneck UI.
-    if cpu_raw_score == 0:
-        cpu_raw_score = 30000  # Default to a high score
-    if gpu_raw_score == 0:
-        gpu_raw_score = 5000   # Default to a low score to force a bottleneck alert
-
-    # Normalize the scores to a 1.0 - 10.0 scale
     cpu_rating = normalize_score(cpu_raw_score)
     gpu_rating = normalize_score(gpu_raw_score)
 
-    # TDP estimation logic (simplified for demo purposes)
-    cpu_tdp = MOCK_DB.get(scanned_cpu, {}).get("tdp", 65)  
-    gpu_tdp = MOCK_DB.get(scanned_gpu, {}).get("tdp", 150) 
     estimated_watts = int((cpu_tdp + gpu_tdp + 50) * 1.2)
     scanned_psu = f"Estimated Required: {estimated_watts}W"
 
-    # Bottleneck detection logic
     bottleneck = "None"
-    if abs(gpu_rating - cpu_rating) > 2.5: #2.5 point threshold for bottleneck detection
+    if abs(gpu_rating - cpu_rating) > 2.5:
         if cpu_rating < gpu_rating:
             bottleneck = "CPU"
         else:
             bottleneck = "GPU"
 
-    # Overall system score is the average of CPU and GPU ratings
-    overall_score = int((cpu_rating + gpu_rating) / 2 * 10)  # Scale to 0-100 for UI display
+    overall_score = int((cpu_rating + gpu_rating) / 2 * 10)
 
-    # --- UPGRADE ADVICE LOGIC ---
-    # This is a placeholder for future logic that could provide upgrade recommendations
     if bottleneck == "GPU":
         insight = f"Your CPU is severely outpacing your graphics card. Upgrading your GPU is recommended, but a stronger GPU means you will likely need a PSU larger than your current {estimated_watts}W requirement."
     elif bottleneck == "CPU":
@@ -167,7 +182,7 @@ def run_diagnostic_scan():
             "analysis": {
                 "bottleneck_detected": bottleneck, 
                 "system_status": "Optimal" if bottleneck == "None" else "Upgrade Recommended",
-                "overall_score": overall_score,  # <--- Send it to React
+                "overall_score": overall_score,
                 "insight_text": insight
             }
         }
