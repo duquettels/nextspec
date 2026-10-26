@@ -1,8 +1,19 @@
-import {useState, useEffect} from "react";
+import { useState, useEffect } from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
+import { fetchScannedData } from "./api/api";
+
 import Sidebar from "./components/Sidebar";
 import RealTimeClock from "./components/RealTimeClock";
+import HardwareInfo from "./components/HardwareInfo";
+
 import Dashboard from "./Renders/Dashboard";
-import { fetchScannedData, fetchPricing } from "./api/api";
+import ThreeDBuilder from "./Renders/ThreeDBuilder";
+import PriceChecker from "./Renders/PriceChecker";
+import GameOptimizer from "./Renders/GameOptimizer";
+import AIUpgradeAdvisor from "./Renders/AIUpgradeAdvisor";
+
+
+
 
 export default function App() {
   const [hardware, setHardware] = useState(null);
@@ -11,7 +22,9 @@ export default function App() {
   const [pricingLoading, setPricingLoading] = useState(true);
   const [error, setError] = useState(null);
 
+
   useEffect(() => {
+    // Use the clean API function instead of raw fetch
     fetchScannedData()
       .then(json => {
         setHardware(json.data);
@@ -35,16 +48,17 @@ export default function App() {
         setLoading(false);
         setPricingLoading(false);
       });
-     }, []);
-if (loading) {
+  }, []);
+
+  if (loading) {
     return (
-    <div className="app-shell">
-      <Sidebar />
-      <div className="main" style={{ justifyContent: 'center', alignItems: 'center' }}>
-        <h2>Loading hardware data...</h2>
+      <div className="app-shell">
+        <Sidebar />
+        <div className="main" style={{ justifyContent: 'center', alignItems: 'center' }}>
+          <h2>Loading hardware data...</h2>
+        </div>
       </div>
-    </div>
-    );  
+    );
   }
 
   if (error) {
@@ -67,13 +81,36 @@ if (loading) {
   return (
     <div className="app-shell">
       <Sidebar />
+
       <div className="main">
         <div className="header">
           <h1>Welcome back, Consumer!</h1>
           <RealTimeClock />
         </div>
-        <Dashboard scannedData={hardware} pricing={pricing} pricingLoading={pricingLoading} />  
+
+        <HardwareInfo scannedData={hardware} />
+
+        <Routes>
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+
+          <Route path ="/dashboard" element={<Dashboard scannedData={hardware} />}
+           />
+
+          <Route path="/3d-builder" element={<ThreeDBuilder scannedData={hardware} />}
+           />
+          <Route path="/price-checker" element={<PriceChecker scannedData={hardware} />}
+           />
+          <Route path="/game-optimizer" element={<GameOptimizer scannedData={hardware} />}
+           />
+          <Route path="/ai-upgrade-advisor" element={<AIUpgradeAdvisor scannedData={hardware}
+           />} />
+
+
+          
+        </Routes>
+
+
       </div>
-  </div>
+    </div>
   );
 }

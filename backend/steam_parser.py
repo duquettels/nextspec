@@ -1,6 +1,5 @@
 import requests
 from bs4 import BeautifulSoup
-import re
 
 def get_game_requirements(app_id: int):
     """
@@ -17,6 +16,7 @@ def get_game_requirements(app_id: int):
 
         game_data = data[str(app_id)]["data"]
         game_name = game_data.get("name", "Unknown Game")
+        header_image = game_data.get("header_image", "")
         pc_requirements = game_data.get("pc_requirements", {})
 
         # Extract raw HTML strings
@@ -25,6 +25,7 @@ def get_game_requirements(app_id: int):
 
         return {
             "game_name": game_name,
+            "header_image": header_image,
             "minimum": extract_hardware_strings(min_html),
             "recommended": extract_hardware_strings(rec_html)
         }
@@ -87,6 +88,16 @@ def search_game_by_name(game_name: str):
     except Exception as e:
         print(f"Search error: {e}")
         return None, None
+
+
+def fetch_steam_specs_by_name(game_name: str):
+    """Wrapper function for the FastAPI backend."""
+    app_id, official_name = search_game_by_name(game_name)
+    
+    if app_id:
+        return get_game_requirements(app_id)
+    return {"error": f"Could not find a Steam game matching '{game_name}'."}
+
 
 # --- Test the Script ---\
 if __name__ == "__main__":

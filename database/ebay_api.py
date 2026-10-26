@@ -100,25 +100,14 @@ def _get_token():
  
  
 def _title_matches(query: str, title: str) -> bool:
-    """
-    eBay's search can silently fall back to 'results matching fewer words' when
-    nothing matches exactly, which is how a search for 'RTX 3090' can return an
-    RTX 3080 listing. This re-checks that every word from the query, including
-    the model number, actually appears in the candidate's title as a whole word,
-    so we never trust a price for the wrong product.
-    """
+
     query_words = re.findall(r"\w+", query.lower())
     title_lower = title.lower()
     return all(re.search(rf"\b{re.escape(word)}\b", title_lower) for word in query_words)
  
  
 def _has_ambiguous_model_numbers(title: str) -> bool:
-    """
-    Flags multi-SKU bundle listings (e.g. Dell OEM pulls titled "RTX 3060 3080
-    3070 3090 8/10/12/24GB") where several distinct model numbers appear in one
-    title and the shown price doesn't reliably map to any specific one of them.
-    A genuine single-card listing has exactly one 4-digit model number.
-    """
+    
     model_numbers = set(re.findall(r"\b\d{4}\b", title))
     return len(model_numbers) > 1
  
@@ -166,7 +155,6 @@ def fetch_ebay_price(query: str, category_id: str, min_price: float, exclude_ter
                      require_pattern=None, reject_pattern=None, check_ambiguous=True):
     """
     Returns (price, url) for the cheapest plausible fixed-price match, or None.
- 
     Restricts to the given eBay category, excludes "for parts/not working"
     listings and common accessory keywords (fans, brackets, heatsinks, etc,
     which share a product title with the real part), then fetches several

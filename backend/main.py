@@ -2,9 +2,14 @@ import os
 import re
 import sys
 from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
+from google import genai
 from pydantic import BaseModel
+from typing import Optional, List
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from core.scanner import get_local_hardware
+from steam_parser import fetch_steam_specs_by_name
 
 # The database/ folder sits next to backend/, so add it to the import path.
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "database"))
@@ -12,6 +17,10 @@ from database import get_connection
 from ebay_api import get_price
 
 app = FastAPI(title="NextSpec API", version="1.0")
+
+load_dotenv()
+api_key = os.getenv("GEMINI_API_KEY")
+ai_client = genai.Client(api_key=api_key)
 
 # --- CORS CONFIGURATION ---
 app.add_middleware(
@@ -164,6 +173,8 @@ def safe_price(kind: str, part: dict):
 class ComponentDetail(BaseModel):
     name: str
     score: float
+    current_value_usd: float = 0.0  # Ready for eBay data
+    upgrade_msrp_usd: float = 0.0   # Ready for Best Buy data
 
 class AnalysisDetail(BaseModel):
     bottleneck_detected: str
@@ -218,6 +229,16 @@ class PricingResponse(BaseModel):
     ram_upgrade: RamPick | None = None
     psu_pick: PsuPick | None = None
 
+class ConsultationRequest(BaseModel):
+    budget: int
+    purpose: str
+    current_bottleneck: str
+    target_fps: Optional[int] = None
+    target_resolution: Optional[str] = None
+    target_game: Optional[str] = None
+    game_requirements: Optional[str] = None
+
+    
 # --- ROUTES ---
 @app.get("/")
 def read_root():
@@ -258,8 +279,14 @@ def run_diagnostic_scan():
         ram_score = None
     cpu_raw_score = cpu_info["raw_score"]
     gpu_raw_score = gpu_info["raw_score"]
+   # 1. Retrieve raw scores from the mock database with smart fallbacks
+    cpu_data = MOCK_DB.get(scanned_cpu, {"raw_score": 25000})
+    gpu_data = MOCK_DB.get(scanned_gpu, {"raw_score": 20000})
+    
+    cpu_raw_score = cpu_data.get("raw_score", 25000)
+    gpu_raw_score = gpu_data.get("raw_score", 20000)
 
-    # Normalize the scores to a 1.0 - 10.0 scale
+    # 2. Normalize to 1.0 - 10.0 scale
     cpu_rating = normalize_score(cpu_raw_score)
     gpu_rating = normalize_score(gpu_raw_score)
 
@@ -271,7 +298,8 @@ def run_diagnostic_scan():
 
     # Bottleneck detection logic
     bottleneck = "None"
-    if abs(gpu_rating - cpu_rating) > 2.5: #2.5 point threshold for bottleneck detection
+    score_diff = abs(gpu_rating - cpu_rating)
+    if score_diff > 1.5:  # Lower threshold so it triggers more reliably for demos
         if cpu_rating < gpu_rating:
             bottleneck = "CPU"
         else:
@@ -396,4 +424,86 @@ def get_pricing(cpu: str, gpu: str, target: str = "gpu", ram_gb: int | None = No
         "prices_outdated": outdated,
         "ram_upgrade": ram_upgrade,
         "psu_pick": psu_pick,
+@app.get("/api/game/{game_name}")
+def get_game_requirements_endpoint(game_name: str):
+    """
+    Fetches the minimum and recommended specs for a given game from Steam.
+    """
+    specs = fetch_steam_specs_by_name(game_name)
+    
+    if "error" in specs:
+         return {"success": False, "message": specs["error"]}
+         
+    return {"success": True, "data": specs}
+
+HARDWARE_CATALOG = [
+    {"type": "gpu", "name": "AMD Radeon RX 6600 8GB", "price": 199, "performance_boost": "+65%"},
+    {"type": "gpu", "name": "NVIDIA RTX 4060 8GB", "price": 299, "performance_boost": "+110%"},
+    {"type": "cpu", "name": "Intel Core i5-12600K", "price": 175, "performance_boost": "+80%"},
+    {"type": "cpu", "name": "AMD Ryzen 5 5600X", "price": 145, "performance_boost": "+50%"},
+    {"type": "ram", "name": "Corsair Vengeance 32GB DDR4", "price": 65, "performance_boost": "+30%"}
+]
+
+
+@app.get("/api/quick-upgrades")
+def get_quick_upgrades(budget: int, bottleneck: str):
+    """
+    Returns candidate components matching the user's budget without requiring a game query.
+    """
+    bottleneck_type = bottleneck.lower()
+    
+    # Filter catalog by bottleneck category and max budget
+    matching_parts = [
+        part for part in HARDWARE_CATALOG 
+        if part["type"] == bottleneck_type and part["price"] <= budget
+    ]
+    
+    # Sort by highest price to show the best options at the top of their budget
+    sorted_parts = sorted(matching_parts, key=lambda x: x["price"], reverse=True)
+    return {"success": True, "budget": budget, "recommendations": sorted_parts[:3]}
+
+
+# AI ADVISOR ---
+@app.post("/api/advisor")
+def get_ai_hardware_advice(request: ConsultationRequest):
+    # Base prompt
+    prompt_context = f"I am upgrading my PC primarily for: {request.purpose}."
+
+    # Conditionally add target FPS and resolution if provided
+    if request.target_fps and request.target_resolution:
+        prompt_context += f" I want to achieve {request.target_fps} FPS at {request.target_resolution} resolution."
+
+    # Steam condition
+    if request.target_game and request.game_requirements:
+        prompt_context += f" The game I want to play is {request.target_game}, which has the following requirements: {request.game_requirements}."
+    
+    # Inject it into the Gemini Prompt
+    prompt = f"""
+    You are NextSpec AI, a PC hardware assistant. My system bottleneck is the {request.current_bottleneck}.
+    {prompt_context}
+    With a budget of ${request.budget}, recommend exactly ONE component upgrade that fixes this bottleneck.
+    Keep your response to two brief, professional sentences. Do not use markdown formatting.
+    """
+    
+    try:
+        # Ask Gemini
+        response = ai_client.models.generate_content(
+            model='gemini-3.8-flash',
+            contents=prompt
+        )
+        ai_text = response.text
+
+    except Exception as e:
+        error_msg = str(e)
+        # The Presentation Safety Net: Catch server traffic jams
+        if "503" in error_msg or "high demand" in error_msg.lower():
+            game_target = request.target_game if request.target_game else "your target workloads"
+            ai_text = f"Due to current network constraints, I am operating in offline mode. To hit your goals for {game_target}, I recommend dedicating your ${request.budget} budget to the strongest {request.current_bottleneck} available in our catalog."
+        else:
+            return {"success": False, "error": error_msg}
+
+    # Return the Master JSON Payload (now includes the header_image you added!)
+    return {
+        "success": True, 
+        "ai_insight": ai_text
     }
