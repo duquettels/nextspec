@@ -1,5 +1,7 @@
 import { useState } from "react";
 
+import ThreeDBuilder from "./ThreeDBuilder";
+
 export default function Dashboard({ scannedData }) {
 
   const [budget, setBudget] = useState(500);
@@ -141,7 +143,9 @@ export default function Dashboard({ scannedData }) {
             <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 5 }}>
               Click a component to view detailed telemetry
             </div>
-            <div className="canvas-area">[ Interactive R3F 3D Model Rendered Here ]</div>
+            <div className="canvas-area">
+              <ThreeDBuilder scannedData={scannedData} />
+            </div>
            </div>
           </div>
 
