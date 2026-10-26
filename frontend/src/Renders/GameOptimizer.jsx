@@ -58,7 +58,7 @@ export default function GameOptimizer({ scannedData }) {
         const specString = `CPU: ${recSpecs.processor}, RAM: ${recSpecs.memory}, GPU: ${recSpecs.graphics}, Storage: ${recSpecs.storage}`;
     
         try {
-            const response = await fetch("http://localhost:8000/api/advisor", {
+            const response = await fetch("http://localhost:8080/api/advisor", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({

@@ -16,7 +16,7 @@ def main():
     python_exe = os.path.join(backend_dir, "venv", "Scripts", "python.exe")
     
     # Flag to hide the massive walls of text from the React and FastAPI servers
-    CREATE_NO_WINDOW = 0x08000000
+    CREATE_NO_WINDOW = 0x08080000
     
     print("====================================")
     print("      INITIALIZING NEXTSPEC         ")
@@ -25,7 +25,7 @@ def main():
     
     # 1. Start FastAPI silently
     backend = subprocess.Popen(
-        [python_exe, "-m", "uvicorn", "main:app", "--reload", "--port", "8000"],
+        [python_exe, "-m", "uvicorn", "main:app", "--reload", "--port", "8080"],
         cwd=backend_dir,
         creationflags=CREATE_NO_WINDOW
     )

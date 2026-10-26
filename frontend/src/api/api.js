@@ -1,5 +1,5 @@
 //API Endpoints here
-const BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 const SCAN_URL = `${BASE}/api/scan`;
 
 //function that will fetch scanned data from the backend API

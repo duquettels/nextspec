@@ -67,13 +67,31 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
       <div className="top-section">
         <div className="col">
           <HardwareInfo scannedData={scannedData} />
-          <div className="panel">
+          <div className="panel" style={{ textAlign: "center" }}>
             <div className="panel-title">Performance Overview</div>
-            <div className="perf-circle">
-              <span>{scannedData?.analysis?.overall_score || "--"}</span>
-              <small>/ 100 {scannedData?.analysis?.system_status?.toUpperCase() || "UNKNOWN"}</small>
+            <div className="perf-circle" style={{ margin: "15px auto" }}>
+              <span style={{ fontSize: "36px", fontWeight: "bold" }}>
+                {scannedData?.analysis?.overall_score ?? "--"}
+              </span>
+              <small style={{ color: "var(--text-muted)", display: "block" }}>/ 100</small>
             </div>
-          </div>
+            <div style={{
+                display: "inline-block",
+                padding: "6px 14px",
+                borderRadius: "20px",
+                fontSize: "12px",
+                fontWeight: "600",
+                letterSpacing: "0.5px",
+                background: scannedData?.analysis?.bottleneck_detected === "None" 
+                  ? "rgba(68, 255, 68, 0.15)" 
+                  : "rgba(255, 68, 68, 0.15)",
+                color: scannedData?.analysis?.bottleneck_detected === "None" ? "#44ff44" : "#ff4444",
+                border: `1px solid ${scannedData?.analysis?.bottleneck_detected === "None" ? "#44ff44" : "#ff4444"}`
+              }}>
+                {scannedData?.analysis?.system_status?.toUpperCase() || "ANALYZING"}
+              </div>
+            </div>
+      
 
           <div className="panel">
           <div className="panel-title">Upgrade Constraints</div>
