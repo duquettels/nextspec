@@ -1,4 +1,8 @@
-export default function Dashboard({ scannedData }) {
+export default function Dashboard({ scannedData, pricing, pricingLoading }) {
+    const money = (n) => (pricingLoading ? "..." : n == null ? "N/A" : `$${Math.round(n).toLocaleString()}`);
+    const outdatedNote = pricing?.prices_outdated ? (
+      <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 8 }}>Price might be outdated</div>
+    ) : null;
 
     return (
         <div className="dashboard-wrapper">
@@ -30,7 +34,12 @@ export default function Dashboard({ scannedData }) {
                   <span className="sys-label">RAM</span>
                   <span className="sys-val">
                     <span className="dot good" />
-                    {scannedData?.ram_gb ? `${scannedData.ram_gb} GB` : "Unknown RAM"}
+                    {scannedData?.ram_gb
+                      ? [`${scannedData.ram_gb} GB`, scannedData.ram?.type,
+                         scannedData.ram?.speed_mts && `${scannedData.ram.speed_mts} MT/s`,
+                         scannedData.ram?.score != null && `score ${scannedData.ram.score}/10`]
+                          .filter(Boolean).join(" · ")
+                      : "Unknown RAM"}
                   </span>
                 </div>
 
@@ -80,21 +89,51 @@ export default function Dashboard({ scannedData }) {
             <div className="panel">
               <div className="panel-title">Upgrade Recommendations</div>
 
-              <div className="rec-item">
-                <div className="rec-header">
-                  <span>Corsair RM1000x PSU</span>
-                  <span className="rec-price">$169.99</span>
+              {pricing?.upgrade ? (
+                <div className="rec-item">
+                  <div className="rec-header">
+                    <span>{pricing.upgrade.name}</span>
+                    <span className="rec-price">
+                      {pricing.upgrade.price != null ? `$${pricing.upgrade.price.toFixed(2)}` : "N/A"}
+                    </span>
+                  </div>
+                  <div className="value-score">+{pricing.upgrade.gain_pct}% performance</div>
                 </div>
-                <div className="value-score">Value Score: 9.2 / 10</div>
-              </div>
-
-              <div className="rec-item">
-                <div className="rec-header">
-                  <span>2TB Samsung 990 Pro</span>
-                  <span className="rec-price">$149.99</span>
+              ) : null}
+              {pricing?.ram_upgrade && (
+                <div className="rec-item">
+                  <div className="rec-header">
+                    <span>{pricing.ram_upgrade.name}</span>
+                    <span className="rec-price">
+                      {pricing.ram_upgrade.price != null ? `$${pricing.ram_upgrade.price.toFixed(2)}` : "N/A"}
+                    </span>
+                  </div>
+                  <div className="value-score">
+                    RAM: {scannedData?.ram_gb} GB → {pricing.ram_upgrade.capacity_gb} GB
+                  </div>
                 </div>
-                <div className="value-score">Value Score: 8.5 / 10</div>
-              </div>
+              )}
+              {pricing?.psu_pick && (
+                <div className="rec-item">
+                  <div className="rec-header">
+                    <span>{pricing.psu_pick.name}</span>
+                    <span className="rec-price">
+                      {pricing.psu_pick.price != null ? `$${pricing.psu_pick.price.toFixed(2)}` : "N/A"}
+                    </span>
+                  </div>
+                  <div className="value-score">PSU: {pricing.psu_pick.wattage}W covers your estimated need</div>
+                </div>
+              )}
+              {!pricing?.upgrade && !pricing?.ram_upgrade && !pricing?.psu_pick && (
+                <div className="rec-item">
+                  <div className="value-score">
+                    {scannedData?.is_laptop
+                      ? "Laptop CPUs and GPUs are soldered, so they can't be swapped. RAM and storage are usually the upgrades to look at."
+                      : pricingLoading ? "Finding upgrades..." : "No upgrade found."}
+                  </div>
+                </div>
+              )}
+              {outdatedNote}
 
               <button className="view-more" type="button">VIEW ALL COMPATIBLE UPGRADES →</button>
             </div>
@@ -104,17 +143,25 @@ export default function Dashboard({ scannedData }) {
               <div className="metrics">
                 <div>
                   <span className="sys-label">Current Value</span>
-                  <span className="val">$1,350</span>
+                  <span className="val">{money(pricing?.current_value)}</span>
                 </div>
                 <div>
                   <span className="sys-label">Upgraded Value</span>
-                  <span className="val">$1,669</span>
+                  <span className="val">{money(pricing?.upgraded_value)}</span>
                 </div>
                 <div>
                   <span className="sys-label">Perf Gain</span>
-                  <span className="val gain">+ 18%</span>
+                  <span className="val gain">
+                    {pricingLoading ? "..." : pricing?.perf_gain_pct != null ? `+ ${pricing.perf_gain_pct}%` : "N/A"}
+                  </span>
                 </div>
               </div>
+              {outdatedNote}
+              {scannedData?.is_laptop && (
+                <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 8 }}>
+                  Part prices don't apply to laptops.
+                </div>
+              )}
             </div>
 
             <div className="panel ai-panel">
@@ -123,9 +170,7 @@ export default function Dashboard({ scannedData }) {
                 {scannedData?.analysis?.insight_text || "No AI insight available."}
               </div>
               <div className="sources">
-                <div className="source-tag">Amazon</div>
-                <div className="source-tag">Newegg</div>
-                <div className="source-tag">Microcenter</div>
+                <div className="source-tag">eBay</div>
               </div>
             </div>
           </div>
