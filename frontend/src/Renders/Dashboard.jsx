@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import ThreeDBuilder from "./ThreeDBuilder";
+import TwoDBuilder from "./TwoDBuilder";
 
 export default function Dashboard({ scannedData }) {
 
@@ -144,7 +144,7 @@ export default function Dashboard({ scannedData }) {
               Click a component to view detailed telemetry
             </div>
             <div className="canvas-area">
-              <ThreeDBuilder scannedData={scannedData} />
+              <TwoDBuilder scannedData={scannedData} />
             </div>
            </div>
           </div>
