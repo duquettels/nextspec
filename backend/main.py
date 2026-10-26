@@ -188,8 +188,11 @@ def get_game_requirements_endpoint(game_name: str):
     return {"success": True, "data": specs}
 
 HARDWARE_CATALOG = [
-    {"type": "gpu", "name": "AMD Radeon RX 6600 8GB", "price": 199, "performance_boost": "+65%"},
+    {"type": "gpu", "name": "NVIDIA GeForce RTX 4080 Super", "price": 999, "performance_boost": "+180%"},
+    {"type": "gpu", "name": "AMD Radeon RX 7800 XT", "price": 499, "performance_boost": "+120%"},
     {"type": "gpu", "name": "NVIDIA RTX 4060 8GB", "price": 299, "performance_boost": "+110%"},
+    {"type": "gpu", "name": "AMD Radeon RX 6600 8GB", "price": 199, "performance_boost": "+65%"},
+    {"type": "cpu", "name": "Intel Core i7-14700K", "price": 399, "performance_boost": "+120%"},
     {"type": "cpu", "name": "Intel Core i5-12600K", "price": 175, "performance_boost": "+80%"},
     {"type": "cpu", "name": "AMD Ryzen 5 5600X", "price": 145, "performance_boost": "+50%"},
     {"type": "ram", "name": "Corsair Vengeance 32GB DDR4", "price": 65, "performance_boost": "+30%"}
@@ -204,6 +207,10 @@ def get_quick_upgrades(budget: int, bottleneck: str):
     """
     bottleneck_type = bottleneck.lower()
     
+    # Fallback for balanced high-end rigs
+    if bottleneck_type in ["none", "unknown"]:
+        bottleneck_type = "gpu"
+        
     # Filter catalog by bottleneck category and max budget
     matching_parts = [
         part for part in HARDWARE_CATALOG 
@@ -256,9 +263,12 @@ def get_ai_hardware_advice(request: ConsultationRequest):
 
     except Exception as e:
         error_msg = str(e)
-        # 3b. The Presentation Safety Net: Catch server traffic jams
+        with open("crash_log.txt", "w") as log_file:
+            log_file.write(f"AI Route Crash: {error_msg}")
+            
         if "503" in error_msg or "high demand" in error_msg.lower():
-            ai_text = f"Due to current system constraints, I am operating in offline mode. To play {request.game_name}, which requires a {steam_gpu}, I recommend dedicating your ${request.budget} budget to the strongest GPU available in the catalog."
+            target = request.game_name if request.game_name else request.purpose
+            ai_text = f"Due to current system constraints, I am operating in offline mode. For {target}, I recommend dedicating your ${request.budget} budget to the strongest {request.current_bottleneck} available."
         else:
             return {"success": False, "error": error_msg}
 

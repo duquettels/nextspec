@@ -4,10 +4,10 @@ import { fetchScannedData } from "./api/api";
 
 import Sidebar from "./components/Sidebar";
 import RealTimeClock from "./components/RealTimeClock";
-import HardwareInfo from "./components/HardwareInfo";
+
 
 import Dashboard from "./Renders/Dashboard";
-import ThreeDBuilder from "./Renders/ThreeDBuilder";
+import ThreeDBuilder from "./Renders/threeDBuilder";
 import PriceChecker from "./Renders/PriceChecker";
 import GameOptimizer from "./Renders/GameOptimizer";
 import AIUpgradeAdvisor from "./Renders/AIUpgradeAdvisor";
@@ -103,11 +103,21 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
-          <Route path ="/dashboard" element={<Dashboard scannedData={hardware} />}
-           />
+          <Route 
+            path="/dashboard" 
+            element={<Dashboard scannedData={hardware} budget={globalBudget} purpose={globalPurpose} />} 
+          />
 
-          <Route path="/3d-builder" element={<ThreeDBuilder scannedData={hardware} />}
-           />
+          <Route 
+              path="/3d-builder" 
+              element={
+                <ThreeDBuilder 
+                  scannedData={hardware} 
+                  budget={globalBudget} 
+                  purpose={globalPurpose} 
+                />
+              } 
+            />
           <Route path="/price-checker" element={<PriceChecker scannedData={hardware} />}
            />
           <Route path="/game-optimizer" element={<GameOptimizer scannedData={hardware} />}

@@ -1,13 +1,14 @@
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
+import HardwareInfo from "../components/HardwareInfo";
 
-export default function Dashboard({ scannedData }) {
+export default function Dashboard({ scannedData, budget, purpose }) {
 
-  const [budget, setBudget] = useState(500);
-  const [purpose, setPurpose] = useState("Gaming");
+  const [budget, setBudget] = useState(budget);
+  const [purpose, setPurpose] = useState(purpose);
   const [fps, setFPS] = useState(60);
   const [resolution, setResolution] = useState("1080p");
 
-  const [aiInsight, setAiInsight] = useState("");
+  const [aiInsight, setAiInsight] = useState("Analyzing hardware telemetry...");
   const [aiLoading, setAiLoading] = useState(false);
   const [recommendations, setRecommendations] = useState([]);
 
@@ -19,7 +20,7 @@ export default function Dashboard({ scannedData }) {
     setAiLoading(true);
     try {
       // Call the backend API to get AI insight
-      const aiResponse = await fetch("http://localhost:8000/api/advisor", {
+      const aiResponse = await fetch("http://localhost:8080/api/advisor", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -41,7 +42,7 @@ export default function Dashboard({ scannedData }) {
 
     // fetch dynamic upgrade recommendations based on budget and bottleneck
       const bottleneck = scannedData?.analysis?.bottleneck_detected || "Unknown";
-      const recsResponse = await fetch(`http://localhost:8000/api/quick-upgrades?budget=${budget}&bottleneck=${bottleneck}`);
+      const recsResponse = await fetch(`http://localhost:8080/api/quick-upgrades?budget=${budget}&bottleneck=${bottleneck}`);
       const recsResult = await recsResponse.json();
       if (recsResult.success) {
         setRecommendations(recsResult.recommendations);
@@ -57,7 +58,7 @@ export default function Dashboard({ scannedData }) {
       <div className="dashboard-wrapper">
         <div className="top-section">
           <div className="col">
-            <HardwareInfo scannedData={hardware} />
+            <HardwareInfo scannedData={scannedData} />
             <div className="panel">
               <div className="panel-title">Performance Overview</div>
               <div className="perf-circle">
