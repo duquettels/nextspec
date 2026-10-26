@@ -6,3 +6,5 @@ taskkill /F /IM node.exe /T 2>nul
 echo Starting NextSpec Backend & Frontend...
 start "NextSpec Backend" cmd /k "cd backend && .\venv\Scripts\activate && uvicorn main:app --port 8080"
 start "NextSpec Frontend" cmd /k "cd frontend && npm run dev"
+
+start chrome --app=http://localhost:5173
