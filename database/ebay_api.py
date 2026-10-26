@@ -6,7 +6,7 @@ from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 from database import get_connection
  
-load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
  
 EBAY_CLIENT_ID = os.getenv("EBAY_CLIENT_ID")
 EBAY_CLIENT_SECRET = os.getenv("EBAY_CLIENT_SECRET")
@@ -31,6 +31,23 @@ CPU_EXCLUDE_TERMS = [
     "broken", "box", "empty", "sticker", "decal", "case", "stand", "mount",
 ]
  
+# RAM: ECC is left out of the eBay search terms on purpose because "non-ECC"
+# listings (the normal desktop kind) would be dropped too. ECC, server and laptop
+# memory is rejected afterwards by RAM_REJECT_PATTERN, which understands "non-ECC".
+RAM_EXCLUDE_TERMS = [
+    "rdimm", "lrdimm", "server", "sodimm", "laptop", "notebook", "lot", "bulk",
+    "heatsink", "heatspreader", "replacement", "repair", "broken", "empty", "box",
+]
+RAM_REJECT_PATTERN = (
+    r"\b(ecc|rdimm|lrdimm|registered|fbdimm|server|so-?dimm|laptop|notebook|"
+    r"lot of|bulk)\b"
+)
+PSU_EXCLUDE_TERMS = [
+    "replacement", "repair", "broken", "empty", "box", "tester", "adapter",
+    "bracket", "fan", "mount", "sticker",
+]
+PSU_REJECT_PATTERN = r"\b(cable kit|cable set|sleeved cables?|extension cables?|cables? only)\b"
+
 TABLE_CONFIG = {
     "cpu": {"table": "cpu_benchmarks", "name_col": "cpu_name", "perf_col": "cpu_mark",
             "category_id": "164", "min_price": 15, "exclude_terms": CPU_EXCLUDE_TERMS,
@@ -38,6 +55,20 @@ TABLE_CONFIG = {
     "gpu": {"table": "gpu_benchmarks", "name_col": "gpu_name", "perf_col": "g3d_mark",
             "category_id": "27386", "min_price": 25, "exclude_terms": GPU_EXCLUDE_TERMS,
             "require_pattern": GPU_REQUIRE_PATTERN},
+    # 170083 = Computer Memory (RAM), 42017 = Power Supplies
+    # memory_score is calculated in load_ram_psu.py. PSUs have no benchmark, so wattage is their number.
+    "ram": {"table": "ram_specs", "name_col": "ram_name", "perf_col": "memory_score",
+            "category_id": "170083", "min_price": 8, "exclude_terms": RAM_EXCLUDE_TERMS,
+            "require_pattern": None},
+    "psu": {"table": "psu_specs", "name_col": "psu_name", "perf_col": "wattage",
+            "category_id": "42017", "min_price": 20, "exclude_terms": PSU_EXCLUDE_TERMS,
+            "require_pattern": None},
+}
+
+# Extra columns RAM and PSU need to build a precise eBay search.
+SEARCH_COLUMNS = {
+    "ram": "base_name, ddr_type, speed_mts, modules, module_gb, capacity_gb",
+    "psu": "base_name, wattage",
 }
  
 _token_cache = {"token": None, "expires_at": 0}
@@ -92,7 +123,47 @@ def _has_ambiguous_model_numbers(title: str) -> bool:
     return len(model_numbers) > 1
  
  
-def fetch_ebay_price(query: str, category_id: str, min_price: float, exclude_terms=None, require_pattern=None):
+def _clean_query(text: str) -> str:
+    # "(2024)" style revision years are in our names but almost never in listing titles
+    text = re.sub(r"\(\s*(19|20)\d{2}\s*\)", " ", text)
+    return re.sub(r"\s+", " ", re.sub(r"[()\[\],]", " ", text)).strip()
+
+
+def _build_search(kind: str, item_name: str, extra):
+    """
+    Returns (query, require_patterns, reject_pattern, check_ambiguous).
+
+    CPU and GPU search by their name, as before. RAM and PSU names are the same
+    product listed at many sizes and speeds, so the search is built from the
+    specs and the listing title must prove it is the same size, speed and kit.
+    """
+    cfg = TABLE_CONFIG[kind]
+    if kind == "ram":
+        base_name, ddr, mts, modules, module_gb, capacity = extra
+        gen = ddr[-1]
+        base = re.sub(r"\s*\d+\s?gb\s*$", "", _clean_query(base_name), flags=re.I)
+        query = base if re.search(rf"\b{ddr}\b", base, re.I) else f"{base} {ddr}"
+        patterns = [
+            # speed: 3600 (or 3601, which some sellers write), or the PC4-28800 style
+            rf"((?<!\d)({mts}|{mts + 1})(?!\d)|pc{gen}l?[- ]?{mts * 8}(?!\d))",
+        ]
+        if modules > 1:
+            patterns.append(rf"\b{modules}\s?x\s?{module_gb}(\s?gb)?\b")
+        else:
+            patterns.append(rf"\b{capacity}\s?gb\b")
+        return query, patterns, RAM_REJECT_PATTERN, False
+    if kind == "psu":
+        base_name, watts = extra
+        # names like "EVGA 700 B1" already contain the wattage, which would
+        # have to appear as its own word in the title, so leave it out of the query
+        words = [w for w in _clean_query(base_name).split() if w != str(watts)]
+        patterns = [rf"(?<!\d){watts}\s?(w|watt|watts)\b"]
+        return " ".join(words), patterns, PSU_REJECT_PATTERN, False
+    return item_name, cfg["require_pattern"], None, True
+
+
+def fetch_ebay_price(query: str, category_id: str, min_price: float, exclude_terms=None,
+                     require_pattern=None, reject_pattern=None, check_ambiguous=True):
     """
     Returns (price, url) for the cheapest plausible fixed-price match, or None.
  
@@ -101,6 +172,11 @@ def fetch_ebay_price(query: str, category_id: str, min_price: float, exclude_ter
     which share a product title with the real part), then fetches several
     candidates sorted by lowest price and returns the first one that also
     clears min_price as a final sanity check.
+
+    require_pattern: a regex, or a list of regexes, that must ALL be found in the
+    lowercase title. reject_pattern: a regex that must NOT be found.
+    check_ambiguous: the "only one 4-digit model number" rule for GPUs and CPUs.
+    It is turned off for RAM and PSUs, whose titles hold speeds like 3200 and 6000.
     """
     token = _get_token()
     search_text = query
@@ -128,9 +204,13 @@ def fetch_ebay_price(query: str, category_id: str, min_price: float, exclude_ter
         title = item.get("title", "")
         if not _title_matches(query, title):
             continue
-        if require_pattern and not re.search(require_pattern, title.lower()):
+        lower = title.lower()
+        patterns = [require_pattern] if isinstance(require_pattern, str) else (require_pattern or [])
+        if not all(re.search(p, lower) for p in patterns):
             continue
-        if _has_ambiguous_model_numbers(title):
+        if reject_pattern and re.search(reject_pattern, re.sub(r"non[- ]?ecc", " ", lower)):
+            continue
+        if check_ambiguous and _has_ambiguous_model_numbers(title):
             continue
         price = item.get("price", {}).get("value")
         if price is None:
@@ -154,19 +234,19 @@ def _is_fresh(updated_at):
  
 def get_price(kind: str, item_name: str):
     """
-    kind: "cpu" or "gpu"
-    item_name: exact value stored in cpu_name / gpu_name
+    kind: "cpu", "gpu", "ram" or "psu"
+    item_name: exact value stored in cpu_name / gpu_name / ram_name / psu_name
  
     Returns {"price": float|None, "value": float|None, "source": str|None, "cached": bool}
     or None if the item isn't in the database at all.
     """
     if kind not in TABLE_CONFIG:
-        raise ValueError("kind must be 'cpu' or 'gpu'")
+        raise ValueError("kind must be 'cpu', 'gpu', 'ram' or 'psu'")
     cfg = TABLE_CONFIG[kind]
     table, name_col, perf_col = cfg["table"], cfg["name_col"], cfg["perf_col"]
     category_id, min_price = cfg["category_id"], cfg["min_price"]
     exclude_terms = cfg["exclude_terms"]
-    require_pattern = cfg["require_pattern"]
+    extra_cols = SEARCH_COLUMNS.get(kind)
  
     conn = get_connection()
     try:
@@ -174,6 +254,7 @@ def get_price(kind: str, item_name: str):
             cur.execute(
                 f"""
                 SELECT {perf_col}, live_price, live_value, price_source, price_updated_at
+                       {", " + extra_cols if extra_cols else ""}
                 FROM {table} WHERE {name_col} = %s
                 """,
                 (item_name,),
@@ -181,7 +262,8 @@ def get_price(kind: str, item_name: str):
             row = cur.fetchone()
             if row is None:
                 return None
-            perf, live_price, live_value, price_source, updated_at = row
+            perf, live_price, live_value, price_source, updated_at = row[:5]
+            extra = row[5:]
  
             if live_price is not None and _is_fresh(updated_at):
                 return {
@@ -191,7 +273,9 @@ def get_price(kind: str, item_name: str):
                     "cached": True,
                 }
  
-            result = fetch_ebay_price(item_name, category_id, min_price, exclude_terms, require_pattern)
+            query, require_pattern, reject_pattern, check_ambiguous = _build_search(kind, item_name, extra)
+            result = fetch_ebay_price(query, category_id, min_price, exclude_terms,
+                                      require_pattern, reject_pattern, check_ambiguous)
             if result is None:
                 cur.execute(
                     f"UPDATE {table} SET price_updated_at = %s WHERE {name_col} = %s",
@@ -227,28 +311,6 @@ def get_price(kind: str, item_name: str):
 if __name__ == "__main__":
     import sys
     if len(sys.argv) != 3:
-        print('Usage: python ebay_api.py <cpu|gpu> "<item name>"')
+        print('Usage: python ebay_api.py <cpu|gpu|ram|psu> "<item name>"')
         sys.exit(1)
     print(get_price(sys.argv[1], sys.argv[2]))
- 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
