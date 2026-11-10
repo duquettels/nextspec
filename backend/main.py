@@ -126,7 +126,7 @@ def find_upgrade(kind: str, current_raw: int, current_name: str, min_gain: float
     if not get_connection:
         return None
     cfg = PART_TABLES[kind]
-    params = [current_raw * min_gain]
+    params: list = [current_raw * min_gain]
     same_socket = ""
     if kind == "cpu":
         same_socket = " AND socket = (SELECT socket FROM cpu_benchmarks WHERE cpu_name = %s)"
