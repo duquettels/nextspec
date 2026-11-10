@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 import psycopg
 
-load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 def get_connection():

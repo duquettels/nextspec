@@ -3,7 +3,6 @@ import { Canvas } from "@react-three/fiber";
 import { useGLTF, OrbitControls, Stage } from "@react-three/drei";
 import * as THREE from "three";
 
-// Moved mapping outside so both components can access it
 const MAPPINGS = {
   GPU: ["4", "5", "12", "35"],
   RAM: ["548", "568", "588", "618"],
@@ -27,21 +26,18 @@ function PCModel({ onPartClick, bottleneck }) {
         const meshID = child.name.replace(/\D/g, '');
         let category = "Unknown";
         for (const [key, ids] of Object.entries(MAPPINGS)) {
-            if (ids.includes(meshID)) category = key;
+          if (ids.includes(meshID)) category = key;
         }
 
-        // Clone material to prevent color bleed across shared textures
         if (child.material) {
           child.material = child.material.clone();
           
           if (category.toUpperCase() === bottleneck?.toUpperCase()) {
-             // Red for the bottleneck component
-             child.material.color.setHex(0xff4444);
-             child.material.emissive = new THREE.Color(0x330000);
+            child.material.color.setHex(0xff4444);
+            child.material.emissive = new THREE.Color(0x330000);
           } else if (category !== "Unknown") {
-             // Green for sufficient components
-             child.material.color.setHex(0x44ff44);
-             child.material.emissive = new THREE.Color(0x002200);
+            child.material.color.setHex(0x44ff44);
+            child.material.emissive = new THREE.Color(0x002200);
           }
         }
       }
@@ -64,7 +60,6 @@ export default function ThreeDBuilder({ scannedData, budget, purpose }) {
   const [selectedPart, setSelectedPart] = useState(null);
   const [aiInsight, setAiInsight] = useState("Analyzing hardware telemetry...");
 
-  // Run AI Advisor on mount
   useEffect(() => {
     if (!scannedData) return;
 
@@ -95,19 +90,19 @@ export default function ThreeDBuilder({ scannedData, budget, purpose }) {
     const meshID = meshName.replace(/\D/g, ''); 
     let category = "Unknown";
     for (const [key, ids] of Object.entries(MAPPINGS)) {
-        if (ids.includes(meshID)) category = key;
+      if (ids.includes(meshID)) category = key;
     }
 
     const isBottleneck = category.toUpperCase() === scannedData.analysis?.bottleneck_detected?.toUpperCase();
 
     switch (category) {
-        case "GPU": return { label: "Graphics Card", name: scannedData.gpu?.name || scannedData.gpu, score: scannedData.gpu?.score, isBottleneck };
-        case "CPU": return { label: "Processor", name: scannedData.cpu?.name || scannedData.cpu, score: scannedData.cpu?.score, isBottleneck };
-        case "RAM": return { label: "System Memory", name: `${scannedData.ram_gb} GB`, score: null, isBottleneck };
-        case "Storage": return { label: "Storage Drive", name: `${scannedData.storage_gb} GB`, score: null, isBottleneck };
-        case "PSU": return { label: "Power Supply", name: scannedData.psu, score: null, isBottleneck };
-        case "Cooling": return { label: "Case Cooling", name: "Standard System Fans", score: null, isBottleneck };
-        default: return { label: "Unmapped Mesh", name: meshName, score: null, isBottleneck: false };
+      case "GPU": return { label: "Graphics Card", name: scannedData.gpu?.name || scannedData.gpu, score: scannedData.gpu?.score, isBottleneck };
+      case "CPU": return { label: "Processor", name: scannedData.cpu?.name || scannedData.cpu, score: scannedData.cpu?.score, isBottleneck };
+      case "RAM": return { label: "System Memory", name: `${scannedData.ram_gb} GB`, score: null, isBottleneck };
+      case "Storage": return { label: "Storage Drive", name: `${scannedData.storage_gb} GB`, score: null, isBottleneck };
+      case "PSU": return { label: "Power Supply", name: scannedData.psu, score: null, isBottleneck };
+      case "Cooling": return { label: "Case Cooling", name: "Standard System Fans", score: null, isBottleneck };
+      default: return { label: "Unmapped Mesh", name: meshName, score: null, isBottleneck: false };
     }
   };
 
@@ -127,8 +122,6 @@ export default function ThreeDBuilder({ scannedData, budget, purpose }) {
         </Canvas>
       </div>
       <div style={{ flex: 1, padding: "20px", borderLeft: "1px solid var(--border-light)", color: "var(--text-main)", display: "flex", flexDirection: "column" }}>
-        
-        {/* Dynamic AI Banner */}
         <div style={{ background: "rgba(0,0,0,0.4)", padding: "15px", borderRadius: "6px", marginBottom: "20px", borderLeft: "4px solid var(--accent-cyan)" }}>
           <h4 style={{ color: "var(--accent-cyan)", margin: "0 0 8px 0", fontSize: "14px" }}>NextSpec AI Advisor</h4>
           <p style={{ fontSize: "13px", color: "var(--text-muted)", margin: 0, lineHeight: "1.4" }}>{aiInsight}</p>
@@ -142,10 +135,10 @@ export default function ThreeDBuilder({ scannedData, budget, purpose }) {
               {activeComponent.name}
             </p>
             {activeComponent.score && (
-               <p style={{ fontSize: "14px", color: "var(--text-muted)" }}>Benchmark Score: <strong style={{ color: "var(--text-main)" }}>{activeComponent.score} / 10</strong></p>
+              <p style={{ fontSize: "14px", color: "var(--text-muted)" }}>Benchmark Score: <strong style={{ color: "var(--text-main)" }}>{activeComponent.score} / 10</strong></p>
             )}
             {activeComponent.isBottleneck && (
-                <p style={{ fontSize: "13px", color: "#ff4444", marginTop: "15px", fontWeight: "bold" }}>⚠️ System Bottleneck Detected</p>
+              <p style={{ fontSize: "13px", color: "#ff4444", marginTop: "15px", fontWeight: "bold" }}>⚠️ System Bottleneck Detected</p>
             )}
           </div>
         ) : (
