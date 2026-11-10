@@ -1,5 +1,5 @@
 //API Endpoints here
-const BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 const SCAN_URL = `${BASE}/api/scan`;
 
 //function that will fetch scanned data from the backend API
@@ -42,4 +42,20 @@ export async function fetchGameRequirements(gameName) {
     }
 
     return result.data;
+}
+
+export async function saveLocalProfile(profileData) {
+    const response = await fetch(`${BASE}/api/save_build`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(profileData)
+    });
+
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Failed to save profile locally');
+    }
+    return result;
 }

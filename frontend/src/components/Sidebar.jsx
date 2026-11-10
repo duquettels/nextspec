@@ -28,11 +28,11 @@ export default function Sidebar() {
             </NavLink>
 
             <NavLink to="/game-optimizer" className={getNavClass}>
-                Optimizer
+                Game Optimizer
             </NavLink>
 
             <NavLink to="/ai-upgrade-advisor" className={getNavClass}>
-                Upgrade Advisor
+                AI Upgrade Advisor
             </NavLink>
 
             <NavLink to="/price-checker" className={getNavClass}>

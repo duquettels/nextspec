@@ -16,6 +16,7 @@
 ## 🔌 API & External Data (Paolo)
 
 **Neon PostgreSQL Integration:** Finalize database schemas (`system_scans`, `recommendations`, `market_prices`) to store user telemetry and generated upgrade paths.
+
 - [ ] **Hardware Valuation (eBay API):** Implement eBay scraping or API queries to average recent sold listings for scanned local hardware to calculate realistic "Current Value".
 - [ ] **Upgrade Pricing (Google Shopping/ Scraper):** Secure live MSRP/pricing data for recommended upgrade components to display accurate market values.
 - [ ] **Persistence Logging:** Ensure backend routes successfully write scan states and AI recommendations into the Neon database during live execution for presentation proof.
@@ -27,11 +28,13 @@
 ## 🧠 Backend & Architecture (Levi)
 
 ### Infrastructure & Routing
+
 - [ ] **Pricing Endpoint:** Finalize the FastAPI pricing route (`GET /api/pricing`) to accept WMI strings and return external vendor pricing data.
 - [ ] **Steam Integration Endpoint:** Ensure `/api/game/{game_name}` cleanly bridges the BeautifulSoup Steam parser with the frontend `GameOptimizer.jsx` component.
 - [ ] **Database Binding:** Add SQL insertion logic inside `/api/scan` and `/api/advisor` to persistently log user scans and AI recommendations to Paolo's PostgreSQL database.
 
 ### Conversational AI Engine
+
 - [ ] **Multi-Turn Chat Sessions:** Update the `/api/advisor` endpoint from a static `generate_content` call to use Gemini's chat session handler (`ai_client.chats.create(...)`) for context-aware, back-and-forth conversations.
 - [ ] **System Instruction Guardrails:** Lock in system instructions for Gemini to ensure it strictly acts as a professional PC hardware consultant and never breaks character.
 - [ ] **Robust Fallbacks:** Maintain the 503 traffic-jam safety net in the backend to ensure a seamless offline demo if network constraints occur during the live presentation.
