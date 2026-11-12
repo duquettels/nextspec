@@ -549,3 +549,119 @@ def save_build(build: SaveBuild):
         return {"success": True, "message": f"Build saved locally to {file_path}"}
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+
+# --- LOAD BUILD ROUTE ---
+@app.get("/api/load-build/{profile_name}")
+def load_build(profile_name: str):
+    file_path = os.path.join(SAVE_DIR, f"{profile_name.replace(' ', '_')}.json")
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Build profile not found.")
+    try:
+        with open(file_path, "r") as f:
+            build_data = json.load(f)
+        return {"success": True, "data": build_data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# --- PARTS SEARCH ROUTE ---
+@app.get("/api/parts/search")
+def search_components(q: str, category: str = "all"):
+    """
+    Searches Neon DB (CPU, GPU, RAM, PSU) + live eBay pricing for any user-typed component.
+    Falls back to local catalog if DB is unavailable.
+    """
+    query = q.strip()
+    if not query:
+        return {"success": True, "results": []}
+
+    results = []
+    cat = category.lower()
+
+    if get_connection:
+        try:
+            with get_connection() as conn:
+                if cat in ("all", "gpu"):
+                    rows = conn.execute(
+                        """SELECT gpu_name, g3d_mark, tdp, price FROM gpu_benchmarks
+                           WHERE gpu_name ILIKE %s ORDER BY g3d_mark DESC LIMIT 6""",
+                        (f"%{query}%",),
+                    ).fetchall()
+                    for r in rows:
+                        price, live = safe_price("gpu", {"db_name": r[0], "list_price": float(r[3]) if r[3] else None})
+                        results.append({
+                            "category": "GPU",
+                            "name": r[0],
+                            "benchmark": f"{r[1]} G3D Mark" if r[1] else "N/A",
+                            "spec": f"{int(r[2])}W TDP" if r[2] else "Graphics Card",
+                            "price": price,
+                            "is_live": live
+                        })
+
+                if cat in ("all", "cpu"):
+                    rows = conn.execute(
+                        """SELECT cpu_name, cpu_mark, tdp, price, socket FROM cpu_benchmarks
+                           WHERE cpu_name ILIKE %s ORDER BY cpu_mark DESC LIMIT 6""",
+                        (f"%{query}%",),
+                    ).fetchall()
+                    for r in rows:
+                        price, live = safe_price("cpu", {"db_name": r[0], "list_price": float(r[3]) if r[3] else None})
+                        results.append({
+                            "category": "CPU",
+                            "name": r[0],
+                            "benchmark": f"{r[1]} CPU Mark" if r[1] else "N/A",
+                            "spec": f"Socket {r[4]}" if r[4] else (f"{int(r[2])}W TDP" if r[2] else "Processor"),
+                            "price": price,
+                            "is_live": live
+                        })
+
+                if cat in ("all", "ram"):
+                    rows = conn.execute(
+                        """SELECT ram_name, memory_score, price, capacity_gb, ddr_type, speed_mts FROM ram_specs
+                           WHERE ram_name ILIKE %s ORDER BY memory_score DESC LIMIT 6""",
+                        (f"%{query}%",),
+                    ).fetchall()
+                    for r in rows:
+                        price, live = safe_price("ram", {"db_name": r[0], "list_price": float(r[2]) if r[2] else None})
+                        results.append({
+                            "category": "RAM",
+                            "name": r[0],
+                            "benchmark": f"{r[1]} Mem Score" if r[1] else "N/A",
+                            "spec": f"{r[3]}GB {r[4]} @ {r[5]} MT/s" if r[3] else "Memory Kit",
+                            "price": price,
+                            "is_live": live
+                        })
+
+                if cat in ("all", "psu"):
+                    rows = conn.execute(
+                        """SELECT psu_name, wattage, efficiency, price FROM psu_specs
+                           WHERE psu_name ILIKE %s ORDER BY wattage ASC LIMIT 6""",
+                        (f"%{query}%",),
+                    ).fetchall()
+                    for r in rows:
+                        price, live = safe_price("psu", {"db_name": r[0], "list_price": float(r[3]) if r[3] else None})
+                        results.append({
+                            "category": "PSU",
+                            "name": r[0],
+                            "benchmark": f"{r[1]}W Output",
+                            "spec": r[2] or "Power Supply",
+                            "price": price,
+                            "is_live": live
+                        })
+        except Exception as e:
+            print(f"Component search DB error: {e}")
+
+    # Local fallback if DB returned nothing or is offline
+    if not results:
+        for item in HARDWARE_CATALOG:
+            if query.lower() in item["name"].lower() and (cat == "all" or item["type"] == cat):
+                results.append({
+                    "category": item["type"].upper(),
+                    "name": item["name"],
+                    "benchmark": item["performance_boost"],
+                    "spec": "Catalog Reference",
+                    "price": float(item["price"]),
+                    "is_live": False
+                })
+
+    return {"success": True, "results": results[:12]}
