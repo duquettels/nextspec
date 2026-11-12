@@ -18,8 +18,12 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
     if (pricing) setLocalPricing(pricing);
   }, [pricing]);
 
-  const isGaming = purpose.includes("Gaming");
-  const money = (v) => (v != null ? `$${Number(v).toFixed(2)}` : "...");
+  const money = (v) => (v != null ? `$${v.toFixed(2)}` : "...");
+  const outdatedNote = pricing?.prices_outdated ? (
+    <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "6px" }}>
+      * Using cached pricing where live market prices were unavailable.
+    </div>
+  ) : null;
 
   const handleUpdateData = useCallback(async () => {
     if (!scannedData) return;
@@ -316,36 +320,34 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
           <div className="metrics" style={{ display: "grid", gap: "10px", margin: "15px 0" }}>
             <div>
               <span className="sys-label" style={{ fontSize: "12px", color: "var(--text-muted)" }}>Current Value: </span>
-              <strong className="val">{money(localPricing?.current_value)}</strong>
+              <strong className="val">{money(pricing?.current_value)}</strong>
             </div>
             <div>
               <span className="sys-label" style={{ fontSize: "12px", color: "var(--text-muted)" }}>Upgraded Value: </span>
-              <strong className="val">{money(localPricing?.upgraded_value)}</strong>
+              <strong className="val">{money(pricing?.upgraded_value)}</strong>
             </div>
             <div>
               <span className="sys-label" style={{ fontSize: "12px", color: "var(--text-muted)" }}>Perf Gain: </span>
               <strong className="val gain" style={{ color: "#44ff44" }}>
-                {localPricing?.perf_gain_pct != null ? `+${localPricing.perf_gain_pct}%` : "N/A"}
+                {pricingLoading ? "..." : pricing?.perf_gain_pct != null ? `+ ${pricing.perf_gain_pct}%` : "N/A"}
               </strong>
             </div>
           </div>
-          {localPricing?.prices_outdated && (
-            <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>
-              * Includes cached DB reference pricing.
+          {outdatedNote}
+          {scannedData?.is_laptop && (
+            <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 8 }}>
+              Part prices don't apply to laptops.
             </div>
           )}
         </div>
 
-        {/* Panel 3: AI Insight */}
         <div className="panel ai-panel">
           <div className="panel-title">AI Insight</div>
           <div className="ai-text" style={{ fontSize: "13px", lineHeight: "1.5", margin: "10px 0" }}>
             {aiInsight || "No AI insight available."}
           </div>
           <div className="sources" style={{ display: "flex", gap: "5px", marginTop: "10px" }}>
-            <div className="source-tag" style={{ fontSize: "10px", background: "rgba(255,255,255,0.05)", padding: "2px 6px", borderRadius: "3px" }}>
-              Neon DB + Ollama
-            </div>
+            <div className="source-tag" style={{ fontSize: "10px", background: "rgba(255,255,255,0.05)", padding: "2px 6px", borderRadius: "3px" }}>eBay</div>
           </div>
         </div>
       </div>
