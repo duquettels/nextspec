@@ -6,12 +6,11 @@
 
 .two-d-model-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 250px;
-  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 16px;
   width: 100%;
   height: 100%;
 }
-
 .computer-image-container {
   position: relative;
   width: 100%;
@@ -181,15 +180,12 @@
   justify-content: center;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1250px) {
   .two-d-model-layout {
     grid-template-columns: 1fr;
   }
 
-  .component-info-panel {
-    min-height: auto;
-  }
-
+  .component-info-panel,
   .component-empty-state {
     min-height: auto;
   }

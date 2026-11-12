@@ -89,6 +89,8 @@
 .rec-header {
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
   margin-bottom: 5px;
   font-size: 13px;
   font-weight: 500;
@@ -97,6 +99,12 @@
 .rec-price {
   color: var(--accent-cyan);
   font-weight: bold;
+  flex-shrink: 0;
+}
+
+.view-more:hover {
+  color: var(--accent-cyan);
+  text-decoration: underline;
 }
 
 .value-score {
