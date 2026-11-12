@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import HardwareInfo from "../components/HardwareInfo";
 import TwoDBuilder from "./TwoDBuilder";
+import { fetchPricing } from "../api/api";
 
 export default function Dashboard({ scannedData, budget: initialBudget, purpose: initialPurpose, pricing, pricingLoading }) {
   const [budget, setBudget] = useState(initialBudget || 500);
@@ -11,8 +12,11 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
   const [aiInsight, setAiInsight] = useState("Analyzing hardware telemetry...");
   const [aiLoading, setAiLoading] = useState(false);
   const [recommendations, setRecommendations] = useState([]);
+  const [localPricing, setLocalPricing] = useState(pricing);
 
-  const isGaming = purpose.includes("Gaming");
+  useEffect(() => {
+    if (pricing) setLocalPricing(pricing);
+  }, [pricing]);
 
   const money = (v) => (v != null ? `$${v.toFixed(2)}` : "...");
   const outdatedNote = pricing?.prices_outdated ? (
@@ -25,31 +29,50 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
     if (!scannedData) return;
 
     setAiLoading(true);
+    const bottleneck = scannedData.analysis?.bottleneck_detected || "None";
+    const cpuName = scannedData.cpu?.name || "";
+    const gpuName = scannedData.gpu?.name || "";
+
     try {
+      // 1. Hardware-aware Ollama AI Insight
       const aiResponse = await fetch("http://localhost:8080/api/advisor", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           budget: parseInt(budget),
           purpose: purpose,
-          current_bottleneck: scannedData.analysis?.bottleneck_detected || "Unknown",
+          current_bottleneck: bottleneck,
           target_fps: isGaming ? parseInt(fps) : null,
-          target_resolution: isGaming ? resolution : null
+          target_resolution: isGaming ? resolution : null,
+          cpu_name: cpuName,
+          gpu_name: gpuName,
+          ram_gb: scannedData.ram_gb
         })
       });
       const aiResult = await aiResponse.json();
       if (aiResult.success) {
         setAiInsight(aiResult.ai_insight);
-      } else {
-        const errorMessage = aiResult.error || JSON.stringify(aiResult.detail) || "Unknown Backend Crash";
-        setAiInsight("AI Error: " + errorMessage);
       }
 
-      const bottleneck = scannedData.analysis?.bottleneck_detected || "Unknown";
-      const recsResponse = await fetch(`http://localhost:8080/api/quick-upgrades?budget=${budget}&bottleneck=${bottleneck}`);
+      // 2. Real Neon DB Upgrade Recommendations matched to current hardware
+      const recsResponse = await fetch(
+        `http://localhost:8080/api/quick-upgrades?budget=${budget}&bottleneck=${encodeURIComponent(bottleneck)}&cpu=${encodeURIComponent(cpuName)}&gpu=${encodeURIComponent(gpuName)}`
+      );
       const recsResult = await recsResponse.json();
       if (recsResult.success) {
         setRecommendations(recsResult.recommendations);
+      }
+
+      // 3. Refresh Price & Value Analysis for current budget
+      if (!scannedData.is_laptop) {
+        const target = bottleneck === "None" ? "none" : (bottleneck === "CPU" ? "cpu" : "gpu");
+        const priceRes = await fetch(
+          `http://localhost:8080/api/pricing?cpu=${encodeURIComponent(cpuName)}&gpu=${encodeURIComponent(gpuName)}&target=${target}&budget=${budget}`
+        );
+        const priceData = await priceRes.json();
+        if (priceData.success) {
+          setLocalPricing(priceData);
+        }
       }
     } catch (err) {
       setAiInsight("Error fetching AI insight.");
@@ -63,6 +86,44 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
       handleUpdateData();
     }
   }, [scannedData, handleUpdateData]);
+
+ 
+  const [savedNotice, setSavedNotice] = useState("");
+
+  const handleSaveBuild = async (upgradePart = null) => {
+    if (!scannedData) return;
+    const isCpu = upgradePart?.type === "cpu";
+    const isGpu = upgradePart?.type === "gpu";
+    const profileName = upgradePart
+      ? `${upgradePart.name.slice(0, 24)} Upgrade`
+      : "Current PC Baseline";
+
+    try {
+      const res = await fetch("http://localhost:8080/api/save-build", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          profile_name: profileName,
+          cpu: isCpu ? upgradePart.name : scannedData.cpu?.name,
+          gpu: isGpu ? upgradePart.name : scannedData.gpu?.name,
+          total_cost_usd: upgradePart ? Number(upgradePart.price) : Number(localPricing?.current_value || 0),
+          ram_gb: scannedData.ram_gb,
+          storage_gb: scannedData.storage_gb,
+          upgraded_part: upgradePart ? upgradePart.name : null,
+          upgraded_category: upgradePart ? upgradePart.type?.toUpperCase() : null,
+          new_score: scannedData.analysis?.overall_score,
+          perf_gain_pct: upgradePart?.gain_pct || 0
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSavedNotice(`Saved "${profileName}"!`);
+        setTimeout(() => setSavedNotice(""), 3000);
+      }
+    } catch {
+      // Ignore
+    }
+  };
 
   return (
     <div className="dashboard-wrapper">
@@ -168,66 +229,92 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
         </div>
       </div>
 
+
       <div className="bottom-section" style={{ marginTop: "20px", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "20px" }}>
+        {/* Panel 1: DB-Matched Upgrade Recommendations */}
         <div className="panel">
           <div className="panel-title">Upgrade Recommendations</div>
-          {pricing?.upgrade && (
-            <div className="rec-item" style={{ marginBottom: "10px" }}>
-              <div className="rec-header">
-                <span>{pricing.upgrade.name}</span>
-                <span className="rec-price">
-                  {pricing.upgrade.price != null ? `$${pricing.upgrade.price.toFixed(2)}` : "N/A"}
-                </span>
-              </div>
-              <div className="value-score" style={{ color: "#44ff44" }}>+{pricing.upgrade.gain_pct}% performance</div>
-            </div>
-          )}
-          {pricing?.ram_upgrade && (
-            <div className="rec-item" style={{ marginBottom: "10px" }}>
-              <div className="rec-header">
-                <span>{pricing.ram_upgrade.name}</span>
-                <span className="rec-price">
-                  {pricing.ram_upgrade.price != null ? `$${pricing.ram_upgrade.price.toFixed(2)}` : "N/A"}
-                </span>
-              </div>
-              <div className="value-score">
-                RAM: {scannedData?.ram_gb} GB → {pricing.ram_upgrade.capacity_gb} GB
-              </div>
-            </div>
-          )}
-          {pricing?.psu_pick && (
-            <div className="rec-item" style={{ marginBottom: "10px" }}>
-              <div className="rec-header">
-                <span>{pricing.psu_pick.name}</span>
-                <span className="rec-price">
-                  {pricing.psu_pick.price != null ? `$${pricing.psu_pick.price.toFixed(2)}` : "N/A"}
-                </span>
-              </div>
-              <div className="value-score">PSU: {pricing.psu_pick.wattage}W required</div>
-            </div>
-          )}
-          {recommendations.length > 0 && !pricing?.upgrade && (
+          {recommendations.length > 0 ? (
             recommendations.map((rec, index) => (
               <div className="rec-item" key={index} style={{ marginBottom: "10px" }}>
                 <div className="rec-header">
                   <span>{rec.name}</span>
-                  <span className="rec-price">${rec.price}</span>
+                  <span className="rec-price">${Number(rec.price).toFixed(2)}</span>
                 </div>
-                <div className="value-score" style={{ color: "#44ff44" }}>Est. Perf Gain: {rec.performance_boost}</div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px" }}>
+                  <span className="value-score" style={{ color: "#44ff44" }}>
+                    Est. Perf Gain: {rec.performance_boost}
+                    {rec.over_budget ? " (Above Budget)" : ""}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleSaveBuild(rec)}
+                    style={{
+                      padding: "3px 8px",
+                      background: "rgba(6, 182, 212, 0.2)",
+                      border: "1px solid var(--accent-cyan)",
+                      color: "var(--accent-cyan)",
+                      borderRadius: "4px",
+                      fontSize: "11px",
+                      fontWeight: "bold",
+                      cursor: "pointer"
+                    }}
+                  >
+                    Save
+                  </button>
+                </div>
               </div>
             ))
-          )}
-          {!pricing?.upgrade && !pricing?.ram_upgrade && !pricing?.psu_pick && recommendations.length === 0 && (
-            <div style={{ fontSize: "13px", color: "var(--text-muted)" }}>
-              {scannedData?.is_laptop 
-                ? "Laptop CPUs and GPUs are integrated. RAM and storage are recommended upgrades." 
-                : pricingLoading ? "Analyzing live vendor prices..." : "Select parameters to view upgrades."}
+          ) : (
+            <div style={{
+              padding: "12px",
+              borderRadius: "8px",
+              background: "rgba(68, 255, 68, 0.08)",
+              border: "1px solid rgba(68, 255, 68, 0.35)",
+              fontSize: "13px",
+              lineHeight: "1.5"
+            }}>
+              <div style={{ color: "#44ff44", fontWeight: "bold", marginBottom: "4px" }}>
+                ✓ No Upgrade Needed
+              </div>
+              <div style={{ color: "var(--text-muted)" }}>
+                Your {scannedData?.gpu?.name} and {scannedData?.cpu?.name} already score{" "}
+                <strong style={{ color: "#fff" }}>{scannedData?.analysis?.overall_score}/100</strong> with no bottlenecks detected.
+              </div>
             </div>
           )}
-          {outdatedNote}
-          <button className="view-more" type="button" style={{ marginTop: "15px", width: "100%" }}>VIEW ALL COMPATIBLE UPGRADES →</button>
+
+          {savedNotice && (
+            <div style={{ fontSize: "12px", color: "#44ff44", marginTop: "10px", fontWeight: "bold" }}>
+              ✓ {savedNotice}
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => handleSaveBuild(recommendations[0] || null)}
+            style={{
+              marginTop: "12px",
+              width: "100%",
+              padding: "9px",
+              background: "rgba(6, 182, 212, 0.15)",
+              border: "1px solid var(--accent-cyan)",
+              color: "var(--accent-cyan)",
+              borderRadius: "6px",
+              fontWeight: "bold",
+              fontSize: "12px",
+              cursor: "pointer"
+            }}
+          >
+            {recommendations.length > 0 ? "SAVE RECOMMENDED BUILD TO PC →" : "SAVE CURRENT BUILD TO PC →"}
+          </button>
+
+          <button className="view-more" type="button" style={{ marginTop: "8px", width: "100%" }}>
+            VIEW ALL COMPATIBLE UPGRADES →
+          </button>
         </div>
 
+        {/* Panel 2: Price and Value Analysis */}
         <div className="panel">
           <div className="panel-title">Price and Value Analysis</div>
           <div className="metrics" style={{ display: "grid", gap: "10px", margin: "15px 0" }}>

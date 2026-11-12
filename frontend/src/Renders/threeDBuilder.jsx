@@ -110,41 +110,127 @@ export default function ThreeDBuilder({ scannedData, budget, purpose }) {
   const systemBottleneck = scannedData?.analysis?.bottleneck_detected || "None";
 
   return (
-    <div style={{ display: "flex", height: "75vh", background: "var(--bg-panel)", borderRadius: "8px", border: "1px solid var(--border-light)" }}>
-      <div style={{ flex: 3 }}>
-        <Canvas shadows camera={{ position: [0, 2, 5], fov: 50 }}>
-          <Suspense fallback={null}>
-            <Stage environment="city" intensity={0.5}>
-              <PCModel onPartClick={setSelectedPart} bottleneck={systemBottleneck} />
-            </Stage>
-          </Suspense>
-          <OrbitControls />
-        </Canvas>
-      </div>
-      <div style={{ flex: 1, padding: "20px", borderLeft: "1px solid var(--border-light)", color: "var(--text-main)", display: "flex", flexDirection: "column" }}>
-        <div style={{ background: "rgba(0,0,0,0.4)", padding: "15px", borderRadius: "6px", marginBottom: "20px", borderLeft: "4px solid var(--accent-cyan)" }}>
-          <h4 style={{ color: "var(--accent-cyan)", margin: "0 0 8px 0", fontSize: "14px" }}>NextSpec AI Advisor</h4>
-          <p style={{ fontSize: "13px", color: "var(--text-muted)", margin: 0, lineHeight: "1.4" }}>{aiInsight}</p>
+    <div style={{ position: "relative", width: "100%", height: "78vh", background: "var(--bg-panel)", borderRadius: "8px", border: "1px solid var(--border-light)", overflow: "hidden" }}>
+      {/* Top-Left Floating Status Legend */}
+      <div style={{
+        position: "absolute",
+        top: "16px",
+        left: "16px",
+        zIndex: 10,
+        background: "rgba(7, 11, 20, 0.85)",
+        backdropFilter: "blur(8px)",
+        padding: "12px 16px",
+        borderRadius: "8px",
+        border: "1px solid var(--border-light)",
+        pointerEvents: "none"
+      }}>
+        <div style={{ fontSize: "14px", fontWeight: "bold", color: "var(--accent-cyan)", marginBottom: "4px" }}>
+          Interactive 3D PC Inspector
         </div>
-
-        <h3 style={{ color: "var(--accent-cyan)", marginTop: 0 }}>Component Inspector</h3>
-        {activeComponent ? (
-          <div>
-            <p style={{ color: "var(--text-muted)", fontSize: "12px", textTransform: "uppercase", marginBottom: "4px" }}>{activeComponent.label}</p>
-            <p style={{ fontWeight: "bold", fontSize: "16px", margin: "0 0 10px 0", color: activeComponent.isBottleneck ? "#ff4444" : "#44ff44" }}>
-              {activeComponent.name}
-            </p>
-            {activeComponent.score && (
-              <p style={{ fontSize: "14px", color: "var(--text-muted)" }}>Benchmark Score: <strong style={{ color: "var(--text-main)" }}>{activeComponent.score} / 10</strong></p>
-            )}
-            {activeComponent.isBottleneck && (
-              <p style={{ fontSize: "13px", color: "#ff4444", marginTop: "15px", fontWeight: "bold" }}>⚠️ System Bottleneck Detected</p>
-            )}
-          </div>
-        ) : (
-          <p style={{ fontSize: "13px", color: "var(--text-muted)" }}>Click a highlighted component on the 3D model to inspect its telemetry.</p>
-        )}
+        <div style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "8px" }}>
+          Click any highlighted component to inspect telemetry
+        </div>
+        <div style={{ display: "flex", gap: "14px", fontSize: "11px" }}>
+          <span style={{ color: "#44ff44" }}>● Optimal</span>
+          <span style={{ color: "#ff4444" }}>● Bottleneck ({systemBottleneck})</span>
+        </div>
       </div>
+
+      {/* Full-Width 3D Canvas */}
+      <Canvas
+        shadows
+        camera={{ position: [0, 2, 5], fov: 50 }}
+        onPointerMissed={() => setSelectedPart(null)}
+      >
+        <Suspense fallback={null}>
+          <Stage environment="city" intensity={0.5}>
+            <PCModel onPartClick={setSelectedPart} bottleneck={systemBottleneck} />
+          </Stage>
+        </Suspense>
+        <OrbitControls />
+      </Canvas>
+
+      {/* Floating Component Popup Card (Appears on Click) */}
+      {activeComponent && (
+        <div style={{
+          position: "absolute",
+          top: "20px",
+          right: "20px",
+          width: "320px",
+          zIndex: 20,
+          background: "rgba(7, 11, 20, 0.94)",
+          backdropFilter: "blur(12px)",
+          padding: "20px",
+          borderRadius: "10px",
+          border: `1px solid ${activeComponent.isBottleneck ? "#ff4444" : "var(--accent-cyan)"}`,
+          boxShadow: "0 12px 32px rgba(0, 0, 0, 0.75)",
+          color: "var(--text-main)"
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+            <span style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.8px", color: "var(--accent-cyan)", fontWeight: "bold" }}>
+              {activeComponent.label}
+            </span>
+            <button
+              onClick={() => setSelectedPart(null)}
+              style={{
+                background: "transparent",
+                border: "none",
+                color: "var(--text-muted)",
+                fontSize: "18px",
+                cursor: "pointer",
+                lineHeight: 1,
+                padding: "0 4px"
+              }}
+              title="Close popup"
+            >
+              ×
+            </button>
+          </div>
+
+          <div style={{
+            fontWeight: "bold",
+            fontSize: "16px",
+            marginBottom: "12px",
+            color: activeComponent.isBottleneck ? "#ff4444" : "#44ff44"
+          }}>
+            {activeComponent.name}
+          </div>
+
+          {activeComponent.score != null && (
+            <div style={{ fontSize: "13px", color: "var(--text-muted)", marginBottom: "10px" }}>
+              Benchmark Rating: <strong style={{ color: "#ffffff" }}>{activeComponent.score} / 10</strong>
+            </div>
+          )}
+
+          {activeComponent.isBottleneck && (
+            <div style={{
+              padding: "8px 10px",
+              background: "rgba(255, 68, 68, 0.15)",
+              border: "1px solid #ff4444",
+              borderRadius: "6px",
+              fontSize: "12px",
+              color: "#ff4444",
+              fontWeight: "bold",
+              marginBottom: "12px"
+            }}>
+              ⚠️ Primary System Bottleneck
+            </div>
+          )}
+
+          <div style={{
+            marginTop: "12px",
+            paddingTop: "12px",
+            borderTop: "1px solid var(--border-light)"
+          }}>
+            <div style={{ fontSize: "11px", color: "var(--accent-cyan)", fontWeight: "bold", marginBottom: "4px" }}>
+              NEXTSPEC AI RECOMMENDATION
+            </div>
+            <p style={{ fontSize: "12px", color: "#e2e8f0", margin: 0, lineHeight: "1.5" }}>
+              {aiInsight}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
