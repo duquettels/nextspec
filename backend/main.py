@@ -4,7 +4,7 @@ import re
 import sys
 from typing import Optional
 
-import psycopg2
+
 from dotenv import load_dotenv
 from google import genai
 from pydantic import BaseModel
@@ -20,12 +20,12 @@ if os.path.exists(db_path):
     sys.path.insert(0, db_path)
 
 try:
-    from database import get_connection
+    from database import get_connection # type: ignore
 except ImportError:
     get_connection = None
 
 try:
-    from ebay_api import get_price
+    from ebay_api import get_price # type: ignore
 except ImportError:
     get_price = None
 
@@ -126,7 +126,7 @@ def find_upgrade(kind: str, current_raw: int, current_name: str, min_gain: float
     if not get_connection:
         return None
     cfg = PART_TABLES[kind]
-    params = [current_raw * min_gain]
+    params: list = [current_raw * min_gain]
     same_socket = ""
     if kind == "cpu":
         same_socket = " AND socket = (SELECT socket FROM cpu_benchmarks WHERE cpu_name = %s)"
