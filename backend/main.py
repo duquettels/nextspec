@@ -138,7 +138,12 @@ def find_upgrade(kind: str, current_raw: int, current_name: str, min_gain: float
         return None
     cfg = PART_TABLES[kind]
     params: list = [current_raw * min_gain]
-    same_socket = ""
+    filters = f"{cfg['perf_col']} >= %s AND price IS NOT NULL AND price > 0"
+
+    if max_budget is not None and max_budget > 0:
+        filters += " AND price <= %s"
+        params.append(max_budget)
+
     if kind == "cpu":
         filters += " AND socket = (SELECT socket FROM cpu_benchmarks WHERE cpu_name = %s)"
         params.append(current_name)
