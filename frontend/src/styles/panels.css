@@ -41,7 +41,10 @@
   font-weight: 500;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 6px;
+  margin-left: auto;
+  text-align: right;
 }
 
 .dot {
