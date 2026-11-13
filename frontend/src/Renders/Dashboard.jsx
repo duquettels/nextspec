@@ -28,6 +28,7 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
   }, [pricing]);
 
   const isGaming = (purpose || "").includes("Gaming");
+  const isLaptop = false;
   const money = (v) => (v != null ? `$${Number(v).toFixed(2)}` : "...");
   const outdatedNote = localPricing?.prices_outdated ? (
     <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "6px" }}>
