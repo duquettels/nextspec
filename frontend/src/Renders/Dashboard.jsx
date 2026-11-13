@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import HardwareInfo from "../components/HardwareInfo";
 import TwoDBuilder from "./TwoDBuilder";
-import { fetchPricing } from "../api/api";
 
 export default function Dashboard({ scannedData, budget: initialBudget, purpose: initialPurpose, pricing, pricingLoading }) {
   const [budget, setBudget] = useState(initialBudget || 500);
@@ -13,13 +12,15 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
   const [aiLoading, setAiLoading] = useState(false);
   const [recommendations, setRecommendations] = useState([]);
   const [localPricing, setLocalPricing] = useState(pricing);
+  const [savedNotice, setSavedNotice] = useState("");
 
   useEffect(() => {
     if (pricing) setLocalPricing(pricing);
   }, [pricing]);
 
-  const money = (v) => (v != null ? `$${v.toFixed(2)}` : "...");
-  const outdatedNote = pricing?.prices_outdated ? (
+  const isGaming = (purpose || "").includes("Gaming");
+  const money = (v) => (v != null ? `$${Number(v).toFixed(2)}` : "...");
+  const outdatedNote = localPricing?.prices_outdated ? (
     <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "6px" }}>
       * Using cached pricing where live market prices were unavailable.
     </div>
@@ -39,10 +40,10 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          budget: parseInt(budget),
+          budget: parseInt(budget, 10),
           purpose: purpose,
           current_bottleneck: bottleneck,
-          target_fps: isGaming ? parseInt(fps) : null,
+          target_fps: isGaming ? parseInt(fps, 10) : null,
           target_resolution: isGaming ? resolution : null,
           cpu_name: cpuName,
           gpu_name: gpuName,
@@ -74,7 +75,7 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
           setLocalPricing(priceData);
         }
       }
-    } catch (err) {
+    } catch {
       setAiInsight("Error fetching AI insight.");
     } finally {
       setAiLoading(false);
@@ -86,9 +87,6 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
       handleUpdateData();
     }
   }, [scannedData, handleUpdateData]);
-
- 
-  const [savedNotice, setSavedNotice] = useState("");
 
   const handleSaveBuild = async (upgradePart = null) => {
     if (!scannedData) return;
@@ -121,7 +119,7 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
         setTimeout(() => setSavedNotice(""), 3000);
       }
     } catch {
-      // Ignore
+      // Ignore save errors if offline
     }
   };
 
@@ -146,8 +144,8 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
               fontSize: "12px",
               fontWeight: "600",
               letterSpacing: "0.5px",
-              background: scannedData?.analysis?.bottleneck_detected === "None" 
-                ? "rgba(68, 255, 68, 0.15)" 
+              background: scannedData?.analysis?.bottleneck_detected === "None"
+                ? "rgba(68, 255, 68, 0.15)"
                 : "rgba(255, 68, 68, 0.15)",
               color: scannedData?.analysis?.bottleneck_detected === "None" ? "#44ff44" : "#ff4444",
               border: scannedData?.analysis?.bottleneck_detected === "None" ? "1px solid #44ff44" : "1px solid #ff4444"
@@ -160,8 +158,8 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
             <div className="panel-title">Upgrade Constraints</div>
             <div style={{ marginBottom: "15px" }}>
               <label style={{ display: "block", fontSize: "13px", color: "var(--text-muted)", marginBottom: "5px" }}>Primary Purpose</label>
-              <select 
-                value={purpose} 
+              <select
+                value={purpose}
                 onChange={(e) => setPurpose(e.target.value)}
                 style={{ width: "100%", padding: "8px", background: "rgba(7, 11, 20, 0.8)", color: "var(--text-main)", border: "1px solid var(--border-light)", borderRadius: "6px" }}
               >
@@ -228,7 +226,6 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
           </div>
         </div>
       </div>
-
 
       <div className="bottom-section" style={{ marginTop: "20px", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "20px" }}>
         {/* Panel 1: DB-Matched Upgrade Recommendations */}
@@ -320,16 +317,16 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
           <div className="metrics" style={{ display: "grid", gap: "10px", margin: "15px 0" }}>
             <div>
               <span className="sys-label" style={{ fontSize: "12px", color: "var(--text-muted)" }}>Current Value: </span>
-              <strong className="val">{money(pricing?.current_value)}</strong>
+              <strong className="val">{money(localPricing?.current_value)}</strong>
             </div>
             <div>
               <span className="sys-label" style={{ fontSize: "12px", color: "var(--text-muted)" }}>Upgraded Value: </span>
-              <strong className="val">{money(pricing?.upgraded_value)}</strong>
+              <strong className="val">{money(localPricing?.upgraded_value)}</strong>
             </div>
             <div>
               <span className="sys-label" style={{ fontSize: "12px", color: "var(--text-muted)" }}>Perf Gain: </span>
               <strong className="val gain" style={{ color: "#44ff44" }}>
-                {pricingLoading ? "..." : pricing?.perf_gain_pct != null ? `+ ${pricing.perf_gain_pct}%` : "N/A"}
+                {pricingLoading ? "..." : localPricing?.perf_gain_pct != null ? `+${localPricing.perf_gain_pct}%` : "N/A"}
               </strong>
             </div>
           </div>
@@ -341,13 +338,16 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
           )}
         </div>
 
+        {/* Panel 3: AI Insight */}
         <div className="panel ai-panel">
           <div className="panel-title">AI Insight</div>
           <div className="ai-text" style={{ fontSize: "13px", lineHeight: "1.5", margin: "10px 0" }}>
             {aiInsight || "No AI insight available."}
           </div>
           <div className="sources" style={{ display: "flex", gap: "5px", marginTop: "10px" }}>
-            <div className="source-tag" style={{ fontSize: "10px", background: "rgba(255,255,255,0.05)", padding: "2px 6px", borderRadius: "3px" }}>eBay</div>
+            <div className="source-tag" style={{ fontSize: "10px", background: "rgba(255,255,255,0.05)", padding: "2px 6px", borderRadius: "3px" }}>
+              Neon DB + Ollama
+            </div>
           </div>
         </div>
       </div>
