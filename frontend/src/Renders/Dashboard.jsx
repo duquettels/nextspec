@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import HardwareInfo from "../components/HardwareInfo";
 import TwoDBuilder from "./TwoDBuilder";
 
@@ -14,6 +14,15 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
   const [localPricing, setLocalPricing] = useState(pricing);
   const [savedNotice, setSavedNotice] = useState("");
 
+  const [catalogCpus, setCatalogCpus] = useState([]);
+  const [catalogGpus, setCatalogGpus] = useState([]);
+  const [selectedCpu, setSelectedCpu] = useState("");
+  const [selectedGpu, setSelectedGpu] = useState("");
+  const [buildAnalysis, setBuildAnalysis] = useState(null);
+
+  const hasInitialFetched = useRef(false);
+  const latestRequestId = useRef(0);
+
   useEffect(() => {
     if (pricing) setLocalPricing(pricing);
   }, [pricing]);
@@ -26,9 +35,99 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
     </div>
   ) : null;
 
+  useEffect(() => {
+    fetch("http://localhost:8080/api/catalog")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) {
+          setCatalogCpus(data.cpus || []);
+          setCatalogGpus(data.gpus || []);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // 2. Recalculate build value, upgrade cost, % gain, and new 0-100 score whenever swap dropdowns change
+  useEffect(() => {
+    if (!scannedData) return;
+    const currCpu = scannedData.cpu?.name || "";
+    const currGpu = scannedData.gpu?.name || "";
+
+    fetch("http://localhost:8080/api/analyze-build", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        current_cpu: currCpu,
+        current_gpu: currGpu,
+        selected_cpu: selectedCpu || currCpu,
+        selected_gpu: selectedGpu || currGpu,
+      }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) {
+          setBuildAnalysis(data);
+        }
+      })
+      .catch(() => {});
+  }, [scannedData, selectedCpu, selectedGpu]);
+
+  // 3. Debounced DB Recommendations + Pricing refresh on Upgrade Constraints changes (no Ollama calls)
+  useEffect(() => {
+    if (!scannedData) return;
+
+    const timer = setTimeout(async () => {
+      const bottleneck = scannedData.analysis?.bottleneck_detected || "None";
+      const cpuName = scannedData.cpu?.name || "";
+      const gpuName = scannedData.gpu?.name || "";
+
+      try {
+        const params = new URLSearchParams({
+          budget: String(budget),
+          bottleneck,
+          cpu: cpuName,
+          gpu: gpuName,
+          purpose,
+          fps: String(isGaming ? fps : 60),
+          resolution: isGaming ? resolution : "1080p",
+        });
+
+        const recsRes = await fetch(`http://localhost:8080/api/quick-upgrades?${params.toString()}`);
+        const recsData = await recsRes.json();
+        const nextRecs = recsData.success ? recsData.recommendations : [];
+        if (recsData.success) {
+          setRecommendations(nextRecs);
+        }
+
+        if (!scannedData.is_laptop) {
+          const activeTarget =
+            nextRecs.length > 0
+              ? nextRecs[0].type
+              : bottleneck === "None"
+              ? "none"
+              : bottleneck.toLowerCase();
+
+          const priceRes = await fetch(
+            `http://localhost:8080/api/pricing?cpu=${encodeURIComponent(cpuName)}&gpu=${encodeURIComponent(gpuName)}&target=${activeTarget}&budget=${budget}`
+          );
+          const priceData = await priceRes.json();
+          if (priceData.success) {
+            setLocalPricing(priceData);
+          }
+        }
+      } catch {
+        // Keep previous recommendations/pricing if offline
+      }
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [scannedData, budget, purpose, isGaming, fps, resolution]);
+  
+
   const handleUpdateData = useCallback(async () => {
     if (!scannedData) return;
 
+    const requestId = ++latestRequestId.current;
     setAiLoading(true);
     const bottleneck = scannedData.analysis?.bottleneck_detected || "None";
     const cpuName = scannedData.cpu?.name || "";
@@ -51,6 +150,7 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
         })
       });
       const aiResult = await aiResponse.json();
+      if (requestId !== latestRequestId.current) return;
       if (aiResult.success) {
         setAiInsight(aiResult.ai_insight);
       }
@@ -60,6 +160,7 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
         `http://localhost:8080/api/quick-upgrades?budget=${budget}&bottleneck=${encodeURIComponent(bottleneck)}&cpu=${encodeURIComponent(cpuName)}&gpu=${encodeURIComponent(gpuName)}`
       );
       const recsResult = await recsResponse.json();
+      if (requestId !== latestRequestId.current) return;
       if (recsResult.success) {
         setRecommendations(recsResult.recommendations);
       }
@@ -71,19 +172,25 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
           `http://localhost:8080/api/pricing?cpu=${encodeURIComponent(cpuName)}&gpu=${encodeURIComponent(gpuName)}&target=${target}&budget=${budget}`
         );
         const priceData = await priceRes.json();
+        if (requestId !== latestRequestId.current) return;
         if (priceData.success) {
           setLocalPricing(priceData);
         }
       }
     } catch {
-      setAiInsight("Error fetching AI insight.");
+      if (requestId === latestRequestId.current) {
+        setAiInsight("Error fetching AI insight.");
+      }
     } finally {
-      setAiLoading(false);
+      if (requestId === latestRequestId.current) {
+        setAiLoading(false);
+      }
     }
   }, [scannedData, budget, purpose, isGaming, fps, resolution]);
 
   useEffect(() => {
-    if (scannedData) {
+    if (scannedData && !hasInitialFetched.current) {
+      hasInitialFetched.current = true;
       handleUpdateData();
     }
   }, [scannedData, handleUpdateData]);
@@ -313,23 +420,146 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
 
         {/* Panel 2: Price and Value Analysis */}
         <div className="panel">
-          <div className="panel-title">Price and Value Analysis</div>
-          <div className="metrics" style={{ display: "grid", gap: "10px", margin: "15px 0" }}>
+          <div className="panel-title">
+            <span>Price and Value Analysis</span>
+            {(selectedCpu || selectedGpu) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedCpu("");
+                  setSelectedGpu("");
+                }}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "var(--accent-cyan)",
+                  fontSize: "10px",
+                  cursor: "pointer",
+                  padding: 0,
+                  textTransform: "uppercase"
+                }}
+              >
+                Reset
+              </button>
+            )}
+          </div>
+
+          {!scannedData?.is_laptop && (
+            <div style={{ display: "grid", gap: "8px", marginBottom: "12px" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "11px", color: "var(--text-muted)", marginBottom: "3px" }}>
+                  Test GPU Swap
+                </label>
+                <select
+                  value={selectedGpu}
+                  onChange={(e) => setSelectedGpu(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "6px 8px",
+                    background: "rgba(7, 11, 20, 0.85)",
+                    color: "var(--text-main)",
+                    border: "1px solid var(--border-light)",
+                    borderRadius: "5px",
+                    fontSize: "12px"
+                  }}
+                >
+                  <option value="">Current: {scannedData?.gpu?.name || "Detected GPU"}</option>
+                  {catalogGpus.map((g, i) => (
+                    <option key={i} value={g.name}>
+                      {g.name} (${g.price})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: "11px", color: "var(--text-muted)", marginBottom: "3px" }}>
+                  Test CPU Swap
+                </label>
+                <select
+                  value={selectedCpu}
+                  onChange={(e) => setSelectedCpu(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "6px 8px",
+                    background: "rgba(7, 11, 20, 0.85)",
+                    color: "var(--text-main)",
+                    border: "1px solid var(--border-light)",
+                    borderRadius: "5px",
+                    fontSize: "12px"
+                  }}
+                >
+                  <option value="">Current: {scannedData?.cpu?.name || "Detected CPU"}</option>
+                  {catalogCpus.map((c, i) => (
+                    <option key={i} value={c.name}>
+                      {c.name} (${c.price})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+
+          <div className="metrics" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", margin: "8px 0" }}>
             <div>
-              <span className="sys-label" style={{ fontSize: "12px", color: "var(--text-muted)" }}>Current Value: </span>
-              <strong className="val">{money(localPricing?.current_value)}</strong>
+              <span className="sys-label" style={{ fontSize: "11px", color: "var(--text-muted)" }}>Current Build:</span>
+              <strong className="val">{money(buildAnalysis?.current_value ?? localPricing?.current_value)}</strong>
             </div>
             <div>
-              <span className="sys-label" style={{ fontSize: "12px", color: "var(--text-muted)" }}>Upgraded Value: </span>
-              <strong className="val">{money(localPricing?.upgraded_value)}</strong>
+              <span className="sys-label" style={{ fontSize: "11px", color: "var(--text-muted)" }}>New Build Value:</span>
+              <strong className="val">{money(buildAnalysis?.upgraded_value ?? localPricing?.upgraded_value)}</strong>
             </div>
             <div>
-              <span className="sys-label" style={{ fontSize: "12px", color: "var(--text-muted)" }}>Perf Gain: </span>
-              <strong className="val gain" style={{ color: "#44ff44" }}>
-                {pricingLoading ? "..." : localPricing?.perf_gain_pct != null ? `+${localPricing.perf_gain_pct}%` : "N/A"}
+              <span className="sys-label" style={{ fontSize: "11px", color: "var(--text-muted)" }}>New Parts Cost:</span>
+              <strong className="val" style={{ color: "var(--accent-cyan)" }}>
+                {money(buildAnalysis?.upgrade_cost ?? 0)}
+              </strong>
+            </div>
+            <div>
+              <span className="sys-label" style={{ fontSize: "11px", color: "var(--text-muted)" }}>Perf & Score:</span>
+              <strong
+                className="val gain"
+                style={{
+                  color: (buildAnalysis?.perf_gain_pct ?? 0) < 0 ? "#ff4444" : "#44ff44"
+                }}
+              >
+                {pricingLoading
+                  ? "..."
+                  : buildAnalysis
+                  ? `${buildAnalysis.perf_gain_pct >= 0 ? "+" : ""}${buildAnalysis.perf_gain_pct}% (${buildAnalysis.new_overall_score}/100)`
+                  : "+0%"}
               </strong>
             </div>
           </div>
+
+          {(buildAnalysis?.cpu_changed || buildAnalysis?.gpu_changed) && (
+            <button
+              type="button"
+              onClick={() =>
+                handleSaveBuild({
+                  name: buildAnalysis.gpu_changed ? buildAnalysis.selected_gpu : buildAnalysis.selected_cpu,
+                  type: buildAnalysis.gpu_changed ? "gpu" : "cpu",
+                  price: buildAnalysis.upgrade_cost,
+                  gain_pct: buildAnalysis.perf_gain_pct,
+                })
+              }
+              style={{
+                marginTop: "10px",
+                width: "100%",
+                padding: "8px",
+                background: "var(--accent-cyan)",
+                color: "#fff",
+                border: "none",
+                borderRadius: "6px",
+                fontWeight: "bold",
+                fontSize: "12px",
+                cursor: "pointer"
+              }}
+            >
+              SAVE CUSTOM BUILD TO PC →
+            </button>
+          )}
+
           {outdatedNote}
           {scannedData?.is_laptop && (
             <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 8 }}>
@@ -337,7 +567,7 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
             </div>
           )}
         </div>
-
+        
         {/* Panel 3: AI Insight */}
         <div className="panel ai-panel">
           <div className="panel-title">AI Insight</div>

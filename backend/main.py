@@ -622,6 +622,93 @@ def get_pricing(cpu: str, gpu: str, target: str = "gpu", ram_gb: int | None = No
         "psu_pick": psu_pick,
     }
 
+class BuildAnalyzeRequest(BaseModel):
+    current_cpu: str
+    current_gpu: str
+    selected_cpu: Optional[str] = None
+    selected_gpu: Optional[str] = None
+
+
+def lookup_score_and_price(kind: str, part_name: str) -> tuple[int, float]:
+    """Resolves (raw_score, price) from Neon DB, MOCK_DB, or HARDWARE_CATALOG."""
+    clean_name = part_name.strip()
+    db_row = safe_find_part(kind, clean_name)
+    if db_row and db_row.get("raw_score"):
+        live_price, _ = safe_price(kind, db_row)
+        price = live_price if live_price is not None else (db_row.get("list_price") or 0.0)
+        return int(db_row["raw_score"]), float(price)
+
+    if clean_name in MOCK_DB:
+        entry = MOCK_DB[clean_name]
+        return int(entry["raw_score"]), float(entry.get("price", 0.0))
+
+    norm_query = clean_part_name(kind, clean_name).lower()
+    for item in HARDWARE_CATALOG:
+        if item["type"] == kind:
+            item_norm = clean_part_name(kind, item["name"]).lower()
+            if norm_query in item_norm or item_norm in norm_query:
+                return int(item["raw_score"]), float(item["price"])
+
+    return 15000, 0.0
+
+
+@app.get("/api/catalog")
+def get_catalog_parts():
+    """Returns CPU and GPU options from HARDWARE_CATALOG for the interactive build analyzer."""
+    cpus = [item for item in HARDWARE_CATALOG if item["type"] == "cpu"]
+    gpus = [item for item in HARDWARE_CATALOG if item["type"] == "gpu"]
+    return {"success": True, "cpus": cpus, "gpus": gpus}
+
+
+@app.post("/api/analyze-build")
+def analyze_custom_build(req: BuildAnalyzeRequest):
+    """Calculates before/after rig value, upgrade part cost, % benchmark gain, and new 0-100 score."""
+    curr_cpu = req.current_cpu.strip()
+    curr_gpu = req.current_gpu.strip()
+    new_cpu = (req.selected_cpu or curr_cpu).strip()
+    new_gpu = (req.selected_gpu or curr_gpu).strip()
+
+    curr_cpu_raw, curr_cpu_price = lookup_score_and_price("cpu", curr_cpu)
+    curr_gpu_raw, curr_gpu_price = lookup_score_and_price("gpu", curr_gpu)
+    new_cpu_raw, new_cpu_price = lookup_score_and_price("cpu", new_cpu)
+    new_gpu_raw, new_gpu_price = lookup_score_and_price("gpu", new_gpu)
+
+    current_value = round(curr_cpu_price + curr_gpu_price, 2)
+    upgraded_value = round(new_cpu_price + new_gpu_price, 2)
+
+    cpu_changed = new_cpu.lower() != curr_cpu.lower()
+    gpu_changed = new_gpu.lower() != curr_gpu.lower()
+    upgrade_cost = round(
+        (new_cpu_price if cpu_changed else 0.0) + (new_gpu_price if gpu_changed else 0.0),
+        2
+    )
+
+    curr_total_raw = max(1, curr_cpu_raw + curr_gpu_raw)
+    new_total_raw = new_cpu_raw + new_gpu_raw
+    perf_gain_pct = round(((new_total_raw - curr_total_raw) / curr_total_raw) * 100)
+
+    new_cpu_rating = normalize_score(new_cpu_raw)
+    new_gpu_rating = normalize_score(new_gpu_raw)
+    new_overall_score = int((new_cpu_rating + new_gpu_rating) / 2 * 10)
+
+    new_bottleneck = "None"
+    if abs(new_gpu_rating - new_cpu_rating) > 2.5:
+        new_bottleneck = "CPU" if new_cpu_rating < new_gpu_rating else "GPU"
+
+    return {
+        "success": True,
+        "selected_cpu": new_cpu,
+        "selected_gpu": new_gpu,
+        "cpu_changed": cpu_changed,
+        "gpu_changed": gpu_changed,
+        "current_value": current_value,
+        "upgraded_value": upgraded_value,
+        "upgrade_cost": upgrade_cost,
+        "perf_gain_pct": perf_gain_pct,
+        "new_overall_score": new_overall_score,
+        "new_bottleneck": new_bottleneck
+    }
+
 
 # --- STEAM REQUIREMENTS ROUTE ---
 @app.get("/api/game/{game_name}")
@@ -640,29 +727,58 @@ def get_hardware_catalog(cpu: Optional[str] = None, gpu: Optional[str] = None):
 
 # --- QUICK UPGRADE ROUTE ---
 @app.get("/api/quick-upgrades")
-def get_quick_upgrades(budget: int, bottleneck: str, cpu: Optional[str] = None, gpu: Optional[str] = None):
-    btnk = bottleneck.strip().lower()
-    if btnk in ("none", "unknown", ""):
-        return {
-            "success": True,
-            "budget": budget,
-            "no_upgrade_needed": True,
-            "recommendations": []
-        }
+def get_quick_upgrades(
+    budget: int,
+    bottleneck: str,
+    cpu: Optional[str] = None,
+    gpu: Optional[str] = None,
+    purpose: Optional[str] = None,
+    fps: Optional[int] = None,
+    resolution: Optional[str] = None,
+):
+    btnk = (bottleneck or "None").strip().lower()
+    purpose_clean = (purpose or "Gaming").strip().lower()
+    res_clean = (resolution or "1080p").strip().upper()
+    target_fps = fps or 60
 
-    current_name = ((cpu if btnk == "cpu" else gpu) or "").strip()
-    current_raw, _ = resolve_part_benchmark(btnk, current_name)
+    demanding_workload = (
+        res_clean in ("1440P", "4K")
+        or target_fps >= 120
+        or purpose_clean in ("video editing", "streaming")
+    )
+
+    # Keep "No Upgrade Needed" at default baseline on a balanced rig,
+    # but unlock optional next-tier upgrades when budget or constraints increase.
+    if btnk in ("none", "unknown", ""):
+        if not demanding_workload and budget <= 550:
+            return {
+                "success": True,
+                "budget": budget,
+                "no_upgrade_needed": True,
+                "recommendations": [],
+            }
+        target_kind = "cpu" if purpose_clean == "video editing" else "gpu"
+        min_multiplier = 1.05
+    else:
+        target_kind = "cpu" if btnk == "cpu" else "gpu"
+        min_multiplier = 1.10
+
+    current_name = ((cpu if target_kind == "cpu" else gpu) or "").strip()
+    current_raw, _ = resolve_part_benchmark(target_kind, current_name)
     if current_raw == 0:
-        current_raw = 15000
+        current_raw = 26900 if target_kind == "gpu" else 31000
 
     recs = []
-    if get_connection and btnk in PART_TABLES:
-        cfg = PART_TABLES[btnk]
+    seen_names = set()
+
+    # 1. Query Neon DB for faster parts within budget
+    if get_connection and target_kind in PART_TABLES:
+        cfg = PART_TABLES[target_kind]
         try:
             with get_connection() as conn:
                 socket_clause = ""
-                params: list = [int(current_raw * 1.10), budget]
-                if btnk == "cpu" and current_name:
+                params: list = [int(current_raw * min_multiplier), budget]
+                if target_kind == "cpu" and current_name:
                     db_cpu = safe_find_part("cpu", current_name)
                     if db_cpu:
                         socket_clause = " AND socket = (SELECT socket FROM cpu_benchmarks WHERE cpu_name = %s)"
@@ -671,38 +787,51 @@ def get_quick_upgrades(budget: int, bottleneck: str, cpu: Optional[str] = None, 
                 rows = conn.execute(
                     f"""SELECT {cfg['name_col']}, {cfg['perf_col']}, price
                         FROM {cfg['table']}
-                        WHERE {cfg['perf_col']} >= %s AND price IS NOT NULL AND price > 0 AND price <= %s{socket_clause}
-                        ORDER BY {cfg['perf_col']}::float / price DESC LIMIT 3""",
+                        WHERE {cfg['perf_col']} >= %s
+                          AND price IS NOT NULL
+                          AND price > 0
+                          AND price <= %s{socket_clause}
+                        ORDER BY {cfg['perf_col']} DESC LIMIT 3""",
                     params,
                 ).fetchall()
 
                 for r in rows:
                     gain_pct = round(((r[1] - current_raw) / max(1, current_raw)) * 100)
-                    recs.append({
-                        "type": btnk,
-                        "name": r[0],
-                        "raw_score": int(r[1]),
-                        "normalized_score": normalize_score(int(r[1])),
-                        "price": round(float(r[2]), 2),
-                        "gain_pct": gain_pct,
-                        "performance_boost": f"+{gain_pct}%"
-                    })
+                    if gain_pct >= 5:
+                        seen_names.add(r[0].lower())
+                        recs.append({
+                            "type": target_kind,
+                            "name": r[0],
+                            "raw_score": int(r[1]),
+                            "normalized_score": normalize_score(int(r[1])),
+                            "price": round(float(r[2]), 2),
+                            "gain_pct": gain_pct,
+                            "performance_boost": f"+{gain_pct}%",
+                        })
         except Exception as e:
             print(f"Quick upgrades DB query failed: {e}")
 
-    if not recs:
+    # 2. Supplement/fallback from HARDWARE_CATALOG if DB has fewer than 3 priced matches
+    if len(recs) < 3:
         catalog = get_enriched_catalog(cpu or "", gpu or "")
-        recs = [
-            item for item in catalog
-            if item["type"] == btnk and item["is_upgrade"] and item["price"] <= budget
-        ]
-        recs.sort(key=lambda x: x["gain_pct"], reverse=True)
+        for item in sorted(catalog, key=lambda x: x["raw_score"], reverse=True):
+            if (
+                item["type"] == target_kind
+                and item["gain_pct"] >= 5
+                and item["price"] <= budget
+                and item["name"].lower() not in seen_names
+            ):
+                seen_names.add(item["name"].lower())
+                recs.append(item)
+            if len(recs) >= 3:
+                break
 
+    recs.sort(key=lambda x: x["raw_score"], reverse=True)
     return {
         "success": True,
         "budget": budget,
         "no_upgrade_needed": len(recs) == 0,
-        "recommendations": recs[:3]
+        "recommendations": recs[:3],
     }
 
 
