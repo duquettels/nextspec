@@ -6,7 +6,7 @@ import * as THREE from "three";
 const MAPPINGS = {
   GPU: ["4", "5", "12", "35"],
   RAM: ["548", "568", "588", "618"],
-  CPU: ["291", "680"],
+  CPU: ["680"],
   Storage: ["77"],
   PSU: ["61", "289", "287"],
   Cooling: ["417", "421", "439", "443", "461", "465", "485", "487", "632", "636", "654", "658"]
@@ -25,6 +25,8 @@ function getMeshCategory(meshName) {
 function PCModel({ onPartClick, onPartHover, bottleneck, selectedPart, hoveredPart, exploded }) {
   const { scene } = useGLTF("/pc_model.glb");
 
+
+  
   useEffect(() => {
     const mappedMeshes = [];
 
@@ -37,7 +39,7 @@ function PCModel({ onPartClick, onPartHover, bottleneck, selectedPart, hoveredPa
 
         const category = getMeshCategory(child.name);
         if (category !== "Unknown") mappedMeshes.push({ mesh: child, category });
-
+        //this 
         if (child.material) {
           child.material = child.material.clone();
           if (child.material.emissive) {
@@ -47,15 +49,15 @@ function PCModel({ onPartClick, onPartHover, bottleneck, selectedPart, hoveredPa
 
           if (category.toUpperCase() === bottleneck?.toUpperCase()) {
             child.material.color.setHex(0xff4444);
-            // child.material.emissive = new THREE.Color(0x330000);
           } else if (category !== "Unknown") {
             child.material.color.setHex(0x44ff44);
-            // child.material.emissive = new THREE.Color(0x002200);
           }
         }
       }
     });
 
+
+    //this forEach is supposed to add outlines to the components.
     mappedMeshes.forEach(({ mesh, category }) => {
       const existingOutline = mesh.getObjectByName("component-outline");
       if (existingOutline) mesh.remove(existingOutline);
@@ -89,6 +91,8 @@ function PCModel({ onPartClick, onPartHover, bottleneck, selectedPart, hoveredPa
     };
   }, [scene, bottleneck]);
 
+
+  //this useEffect is supposed to change the colors of components when hovered or selected.
   useEffect(() => {
     scene.traverse((child) => {
       if (
@@ -104,6 +108,7 @@ function PCModel({ onPartClick, onPartHover, bottleneck, selectedPart, hoveredPa
       const isHovered = child.name === hoveredPart;
       const isBottleneck = category.toUpperCase() === bottleneck?.toUpperCase();
 
+      //different colors for selected, hovered, bottleneck, and default states
       if (isSelected) {
         child.material.color.setHex(0xffff00);
       } else if (isHovered) {
@@ -116,16 +121,19 @@ function PCModel({ onPartClick, onPartHover, bottleneck, selectedPart, hoveredPa
     });
   }, [scene, selectedPart, hoveredPart, bottleneck]);
 
+  //useEffect for the explode button
   useEffect(() => {
     const offsets = {
-      CPU: [0, 1.5, 0],
+      CPU: [0, -7, 0],
       RAM: [0.8, 0.4, 0],
-      GPU: [0, -7, 0.9],
-      Storage: [-0.8, -0.2, 0.4],
-      PSU: [0, -0.8, -0.5],
-      Cooling: [0, 0.5, -0.8]
+      GPU: [-7.5, 0, -.5],
+      Storage: [3, 0, -3.5],
+      PSU: [-2.5, 0, 0],
+      Cooling: [0, 0, 0]
     };
+    
 
+    //this function is the one that moves the components when the explode button is clicked, looks really funky so far.
     scene.traverse((child) => {
       if (!child.isMesh || child.name === "Object_790") {
         return;
@@ -143,6 +151,7 @@ function PCModel({ onPartClick, onPartHover, bottleneck, selectedPart, hoveredPa
 
         const [x, y, z] = offsets[category];
 
+        //this moves the components to exploded positions
         if (exploded) {
           child.position.set(
             child.userData.originalPosition.x + x,
@@ -150,6 +159,8 @@ function PCModel({ onPartClick, onPartHover, bottleneck, selectedPart, hoveredPa
             child.userData.originalPosition.z + z
           );
         } else {
+
+          //this returns the components to their original positions when the explode button is clicked again
           child.position.copy(child.userData.originalPosition);
         }
     });

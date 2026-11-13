@@ -230,6 +230,9 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
     }
   };
 
+  const performanceScore = Math.max(0, Math.min(Number(scannedData?.analysis?.overall_score || 0), 100)
+
+  )
   return (
     <div className="dashboard-wrapper">
       <div className="top-section">
@@ -238,7 +241,9 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
 
           <div className="panel" style={{ textAlign: "center" }}>
             <div className="panel-title">Performance Overview</div>
-            <div className="perf-circle" style={{ margin: "15px auto" }}>
+
+            <div className="perf-circle" style={{"--score": `${performanceScore * 3.6}deg`,
+            margin: "15px auto" }}>
               <span style={{ fontSize: "36px", fontWeight: "bold" }}>
                 {scannedData?.analysis?.overall_score ?? "--"}
               </span>
