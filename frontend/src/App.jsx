@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { fetchScannedData, fetchPricing } from "./api/api";
 
 import Sidebar from "./components/Sidebar";
@@ -12,6 +12,22 @@ import GameOptimizer from "./Renders/GameOptimizer";
 import AIUpgradeAdvisor from "./Renders/AIUpgradeAdvisor";
 
 export default function App() {
+  const location = useLocation();
+
+  useEffect(() => {
+  const pageTitles = {
+    "/dashboard": "Dashboard",
+    "/3d-builder": "3D Builder",
+    "/game-optimizer": "Game Optimizer",
+    "/ai-upgrade-advisor": "AI Upgrade Advisor",
+    "/price-checker": "Price Checker"
+  };
+
+  document.title = `NextSpec | ${
+    pageTitles[location.pathname] || "NextSpec"
+  }`;
+  }, [location.pathname]);
+
   const [hardware, setHardware] = useState(null);
   const [loading, setLoading] = useState(true);
   const [pricing, setPricing] = useState(null);
