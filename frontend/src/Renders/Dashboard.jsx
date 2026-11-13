@@ -101,7 +101,7 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
           setRecommendations(nextRecs);
         }
 
-        if (!scannedData.is_laptop) {
+        if (!isLaptop) {
           const activeTarget =
             nextRecs.length > 0
               ? nextRecs[0].type
@@ -456,7 +456,7 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
             )}
           </div>
 
-          {!scannedData?.is_laptop && (
+          {!isLaptop && (
             <div style={{ display: "grid", gap: "8px", marginBottom: "12px" }}>
               <div>
                 <label style={{ display: "block", fontSize: "11px", color: "var(--text-muted)", marginBottom: "3px" }}>
@@ -573,7 +573,7 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
           )}
 
           {outdatedNote}
-          {scannedData?.is_laptop && (
+          {isLaptop && (
             <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 8 }}>
               Part prices don't apply to laptops.
             </div>
