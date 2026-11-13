@@ -1,74 +1,107 @@
 # ⬡ NextSpec
 **AI-Powered 3D PC Diagnostic & Upgrade Visualizer**
 
-### CSC 490 Senior Capstone
+### CSC 490 Senior Capstone — UNCG
+* **Levi Duquette:** Backend Architecture, WMI Diagnostics, Local AI Integration
+* **Allen Orozco:** React Frontend, Interactive 3D WebGL UI
+* **Paolo Ordinario:** Neon PostgreSQL Database, External API & Pricing Integration
 
-* **Levi Duquette:** Backend Architecture, WMI Diagnostics, AI Logic
-* **Allen Orozco:** React Frontend, 3D WebGL UI
-* **Paolo Ordinario:** PostgreSQL Database, External API Integration
+---
 
-### Project Structure
+## Core Features
 
-* `/backend` - FastAPI Python server and diagnostic scripts.
-* `/frontend` - React / React Three Fiber client.
-* `/database` - SQL schemas for Neon PostgreSQL.
-* `/docs` - System diagrams and UI prototypes.
+* **Automated Hardware Telemetry & Scoring:** Scans local Windows hardware via WMI (`CPU`, `GPU`, `RAM`, `Storage`) and computes a normalized `0–100` performance score with bottleneck detection.
+* **Interactive 3D System Visualizer:** Renders an interactive Three.js / React Three Fiber PC layout directly on the dashboard and 3D Builder views.
+* **Constraint-Aware Upgrade Recommendations:** Queries real PassMark benchmark tables and pricing in Neon PostgreSQL, dynamically filtering socket-compatible upgrades by **Budget**, **Primary Purpose**, **Target FPS**, and **Resolution**.
+* **Interactive Price & Value Sandbox:** Lets users test CPU and GPU swaps in real time to compare **Current Build Value**, **New Build Value**, **New Parts Cost**, and recalculated **`0–100` performance gains**, with one-click local build saving.
+* **Local Ollama AI Advisor & Game Optimizer:** Runs local LLM inference via **Ollama (`llama3.2:3b`)** with response caching and deterministic fallback logic—providing tailored upgrade advice and Steam game requirement tuning with zero cloud AI API costs.
 
-### Architecture (MVC)
-* **View (Frontend):** React & React Three Fiber (R3F) for interactive 3D rendering and dashboard UI.
-* **Controller (API Gateway):** FastAPI coordinates the local WMI hardware scan, web scraping, and AI prompt injection.
-* **Model (Data Layer):** Neon PostgreSQL (integration in progress) and live web APIs (Steam, Gemini, eBay).
+---
 
-## 🛠️ Local Development Setup
+## Project Structure
 
-Currently, NextSpec is in the Milestone 1 development phase. To run the backend diagnostic API locally, follow these steps:
+* `/backend` — FastAPI Python server, WMI diagnostic scanner, Neon DB queries, and Ollama integration.
+* `/frontend` — React + Vite + React Three Fiber (R3F) client UI.
+* `/database` — SQL schemas and PassMark benchmark tables for Neon PostgreSQL.
+* `/docs` — System architecture diagrams and UI prototypes.
+* `start.bat` — One-click Windows launcher that preloads Ollama, starts FastAPI on port `8080`, and launches Vite on port `5173`.
 
-### 1. Start the Backend (FastAPI)
+---
 
-You must navigate into the `backend` folder before starting the Uvicorn server, or the application will fail to import the scanner modules.
+## Architecture (MVC)
+
+* **View (Frontend):** React, Vite, and React Three Fiber (R3F) for interactive 3D hardware visualization, debounced constraint filtering, and live build-swap analytics.
+* **Controller (API Gateway):** FastAPI coordinates local WMI hardware scanning, SQL benchmark filtering, Steam requirement scraping, local JSON build persistence, and Ollama prompt generation.
+* **Model (Data Layer):** Neon PostgreSQL (CPU/GPU PassMark benchmarks and market pricing) paired with local Ollama (`llama3.2:3b`) inference and live Steam/vendor data.
+
+---
+
+## Local Development Setup
+
+### 1. Install & Pull the Local AI Model (Ollama)
+
+NextSpec uses **Ollama** running locally so no external AI API keys are required.
+
+```bash
+# Windows (PowerShell / CMD)
+winget install -e --id Ollama.Ollama
+
+# macOS
+brew install ollama
+
+# Pull the model used by the backend advisor (~2 GB)
+ollama pull llama3.2:3b
+```
+
+### 2. Quick Start (Windows)
+
+From the repository root, run `start.bat` (or run as Administrator for full WMI hardware telemetry) to start Ollama, the FastAPI backend (`:8080`), and the React frontend (`:5173`) automatically.
+
+### 3. Manual Setup (Backend & Frontend)
+
+#### Start the Backend (FastAPI)
+Navigate into the `backend` directory before starting Uvicorn so the local scanner modules import properly:
 
 ```bash
 # Clone the repository
 git clone [https://github.com/YOUR-ORG/nextspec.git](https://github.com/YOUR-ORG/nextspec.git)
-
-# Navigate into the backend directory
 cd nextspec/backend
 
-# Install dependencies
+# Install Python dependencies
 python -m pip install -r requirements.txt
+```
 
-# Environment Variables:
-# Create a .env file in the backend root and add your API keys:
-GEMINI_API_KEY=your_google_key
+Create a `.env` file inside `/backend` with your Neon PostgreSQL connection string:
+
+```env
+DATABASE_URL=your_neon_postgresql_connection_string
+# Optional live pricing credentials (falls back to Neon DB list prices if omitted)
 EBAY_CLIENT_ID=your_ebay_id
 EBAY_CLIENT_SECRET=your_ebay_secret
-DATABASE_URL=your_neon_db_string
-
-# Run the local server
-python -m uvicorn main:app --reload
 ```
 
-### 2. View the API Documentation
-
-Once the server is running, open your web browser and navigate to:
+Run the FastAPI server on port `8080`:
 
 ```bash
-http://localhost:8080/docs
+python -m uvicorn main:app --reload --port 8080
 ```
 
-This will load the interactive Swagger UI where you can view the exact JSON payload structure and test the /api/scan endpoint.
+Interactive Swagger API documentation is available at `http://localhost:8080/docs`.
 
-### 3. Start the Frontend Model
-
-Once the backend server is running, we can run the frontend.
+#### Start the Frontend (React + Vite)
+In a second terminal:
 
 ```bash
+cd nextspec/frontend
 npm install
-```
-
-After that is installed, we can then:
-```bash
 npm run dev
 ```
 
-Once that is complete, you can then hit CTRL + click on the localhost url!
+Open `http://localhost:5173` in your browser to launch the application.
+
+---
+
+## Future Roadmap (Phase 2)
+
+* **Full-System Compatibility Engine:** Expand WMI telemetry and Neon PostgreSQL schemas to evaluate motherboard chipsets/DIMM slots, DDR4 vs. DDR5 memory kits, and PSU wattage headroom.
+* **From-Scratch PC Builder:** Add a ground-up build mode with cascading compatibility filters alongside existing-rig upgrade diagnostics.
