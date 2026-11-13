@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import HardwareInfo from "../components/HardwareInfo";
-import TwoDBuilder from "./TwoDBuilder";
+import ThreeDBuilder from "./threeDBuilder";
 
 export default function Dashboard({ scannedData, budget: initialBudget, purpose: initialPurpose, pricing, pricingLoading }) {
   const [budget, setBudget] = useState(initialBudget || 500);
@@ -329,7 +329,7 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
             Interactive Telemetry Layout
           </div>
           <div className="canvas-area">
-            <TwoDBuilder scannedData={scannedData} />
+            <ThreeDBuilder scannedData={scannedData} />
           </div>
         </div>
       </div>
