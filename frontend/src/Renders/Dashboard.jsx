@@ -212,7 +212,7 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
             <div className="panel-title">How It Works</div>
             <div className="step"><div className="step-num">1</div>Scan local WMI hardware info</div>
             <div className="step"><div className="step-num">2</div>AI maps compatibility</div>
-            <div className="step"><div className="step-num">3</div>Fetch live vendor pricing</div>
+            <div className="step"><div className="step-num">3</div>Fetch live vendor pricing.</div>
           </div>
         </div>
 
