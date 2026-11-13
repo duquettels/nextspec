@@ -35,6 +35,7 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
     </div>
   ) : null;
 
+  // 1. Load CPU & GPU catalog options once for Panel 2 swap dropdowns
   useEffect(() => {
     fetch("http://localhost:8080/api/catalog")
       .then((res) => res.json())
@@ -122,8 +123,8 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
 
     return () => clearTimeout(timer);
   }, [scannedData, budget, purpose, isGaming, fps, resolution]);
-  
 
+  // 4. Ollama AI Insight only (never overwrites constraint-filtered recommendations or pricing)
   const handleUpdateData = useCallback(async () => {
     if (!scannedData) return;
 
@@ -134,48 +135,23 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
     const gpuName = scannedData.gpu?.name || "";
 
     try {
-      // 1. Hardware-aware Ollama AI Insight
       const aiResponse = await fetch("http://localhost:8080/api/advisor", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           budget: parseInt(budget, 10),
-          purpose: purpose,
+          purpose,
           current_bottleneck: bottleneck,
           target_fps: isGaming ? parseInt(fps, 10) : null,
           target_resolution: isGaming ? resolution : null,
           cpu_name: cpuName,
           gpu_name: gpuName,
-          ram_gb: scannedData.ram_gb
-        })
+          ram_gb: scannedData.ram_gb,
+        }),
       });
       const aiResult = await aiResponse.json();
-      if (requestId !== latestRequestId.current) return;
-      if (aiResult.success) {
+      if (requestId === latestRequestId.current && aiResult.success) {
         setAiInsight(aiResult.ai_insight);
-      }
-
-      // 2. Real Neon DB Upgrade Recommendations matched to current hardware
-      const recsResponse = await fetch(
-        `http://localhost:8080/api/quick-upgrades?budget=${budget}&bottleneck=${encodeURIComponent(bottleneck)}&cpu=${encodeURIComponent(cpuName)}&gpu=${encodeURIComponent(gpuName)}`
-      );
-      const recsResult = await recsResponse.json();
-      if (requestId !== latestRequestId.current) return;
-      if (recsResult.success) {
-        setRecommendations(recsResult.recommendations);
-      }
-
-      // 3. Refresh Price & Value Analysis for current budget
-      if (!scannedData.is_laptop) {
-        const target = bottleneck === "None" ? "none" : (bottleneck === "CPU" ? "cpu" : "gpu");
-        const priceRes = await fetch(
-          `http://localhost:8080/api/pricing?cpu=${encodeURIComponent(cpuName)}&gpu=${encodeURIComponent(gpuName)}&target=${target}&budget=${budget}`
-        );
-        const priceData = await priceRes.json();
-        if (requestId !== latestRequestId.current) return;
-        if (priceData.success) {
-          setLocalPricing(priceData);
-        }
       }
     } catch {
       if (requestId === latestRequestId.current) {
@@ -216,9 +192,9 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
           storage_gb: scannedData.storage_gb,
           upgraded_part: upgradePart ? upgradePart.name : null,
           upgraded_category: upgradePart ? upgradePart.type?.toUpperCase() : null,
-          new_score: scannedData.analysis?.overall_score,
-          perf_gain_pct: upgradePart?.gain_pct || 0
-        })
+          new_score: buildAnalysis?.new_overall_score ?? scannedData.analysis?.overall_score,
+          perf_gain_pct: upgradePart?.gain_pct || 0,
+        }),
       });
       const data = await res.json();
       if (data.success) {
@@ -230,9 +206,8 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
     }
   };
 
-  const performanceScore = Math.max(0, Math.min(Number(scannedData?.analysis?.overall_score || 0), 100)
+  const performanceScore = Math.max(0, Math.min(Number(scannedData?.analysis?.overall_score || 0), 100));
 
-  )
   return (
     <div className="dashboard-wrapper">
       <div className="top-section">
@@ -242,8 +217,10 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
           <div className="panel" style={{ textAlign: "center" }}>
             <div className="panel-title">Performance Overview</div>
 
-            <div className="perf-circle" style={{"--score": `${performanceScore * 3.6}deg`,
-            margin: "15px auto" }}>
+            <div
+              className="perf-circle"
+              style={{ "--score": `${performanceScore * 3.6}deg`, margin: "15px auto" }}
+            >
               <span style={{ fontSize: "36px", fontWeight: "bold" }}>
                 {scannedData?.analysis?.overall_score ?? "--"}
               </span>
@@ -269,7 +246,9 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
           <div className="panel">
             <div className="panel-title">Upgrade Constraints</div>
             <div style={{ marginBottom: "15px" }}>
-              <label style={{ display: "block", fontSize: "13px", color: "var(--text-muted)", marginBottom: "5px" }}>Primary Purpose</label>
+              <label style={{ display: "block", fontSize: "13px", color: "var(--text-muted)", marginBottom: "5px" }}>
+                Primary Purpose
+              </label>
               <select
                 value={purpose}
                 onChange={(e) => setPurpose(e.target.value)}
@@ -293,8 +272,14 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
                   <input type="range" min="30" max="240" step="10" value={fps} onChange={(e) => setFPS(e.target.value)} style={{ width: "100%" }} />
                 </div>
                 <div style={{ flex: 1 }}>
-                  <label style={{ display: "block", fontSize: "13px", color: "var(--text-muted)", marginBottom: "5px" }}>Resolution</label>
-                  <select value={resolution} onChange={(e) => setResolution(e.target.value)} style={{ width: "100%", padding: "8px", background: "rgba(7, 11, 20, 0.8)", color: "var(--text-main)", border: "1px solid var(--border-light)", borderRadius: "6px" }}>
+                  <label style={{ display: "block", fontSize: "13px", color: "var(--text-muted)", marginBottom: "5px" }}>
+                    Resolution
+                  </label>
+                  <select
+                    value={resolution}
+                    onChange={(e) => setResolution(e.target.value)}
+                    style={{ width: "100%", padding: "8px", background: "rgba(7, 11, 20, 0.8)", color: "var(--text-main)", border: "1px solid var(--border-light)", borderRadius: "6px" }}
+                  >
                     <option value="1080p">1080p</option>
                     <option value="1440p">1440p</option>
                     <option value="4K">4K</option>
@@ -324,7 +309,7 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
             <div className="panel-title">How It Works</div>
             <div className="step"><div className="step-num">1</div>Scan local WMI hardware info</div>
             <div className="step"><div className="step-num">2</div>AI maps compatibility</div>
-            <div className="step"><div className="step-num">3</div>Fetch live vendor pricing.</div>
+            <div className="step"><div className="step-num">3</div>Fetch live vendor pricing</div>
           </div>
         </div>
 
@@ -333,7 +318,7 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
           <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 5 }}>
             Interactive Telemetry Layout
           </div>
-          <div className="canvas-area">
+          <div className="canvas-area" style={{ width: "100%", height: "420px" }}>
             <ThreeDBuilder scannedData={scannedData} />
           </div>
         </div>
@@ -355,22 +340,43 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
                     Est. Perf Gain: {rec.performance_boost}
                     {rec.over_budget ? " (Above Budget)" : ""}
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => handleSaveBuild(rec)}
-                    style={{
-                      padding: "3px 8px",
-                      background: "rgba(6, 182, 212, 0.2)",
-                      border: "1px solid var(--accent-cyan)",
-                      color: "var(--accent-cyan)",
-                      borderRadius: "4px",
-                      fontSize: "11px",
-                      fontWeight: "bold",
-                      cursor: "pointer"
-                    }}
-                  >
-                    Save
-                  </button>
+                  <div style={{ display: "flex", gap: "6px" }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (rec.type === "cpu") setSelectedCpu(rec.name);
+                        else setSelectedGpu(rec.name);
+                      }}
+                      style={{
+                        padding: "3px 8px",
+                        background: "rgba(59, 130, 246, 0.2)",
+                        border: "1px solid var(--accent-blue)",
+                        color: "var(--accent-blue)",
+                        borderRadius: "4px",
+                        fontSize: "11px",
+                        fontWeight: "bold",
+                        cursor: "pointer"
+                      }}
+                    >
+                      Analyze
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSaveBuild(rec)}
+                      style={{
+                        padding: "3px 8px",
+                        background: "rgba(6, 182, 212, 0.2)",
+                        border: "1px solid var(--accent-cyan)",
+                        color: "var(--accent-cyan)",
+                        borderRadius: "4px",
+                        fontSize: "11px",
+                        fontWeight: "bold",
+                        cursor: "pointer"
+                      }}
+                    >
+                      Save
+                    </button>
+                  </div>
                 </div>
               </div>
             ))
@@ -423,7 +429,7 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
           </button>
         </div>
 
-        {/* Panel 2: Price and Value Analysis */}
+        {/* Panel 2: Interactive Build & Price Value Analysis */}
         <div className="panel">
           <div className="panel-title">
             <span>Price and Value Analysis</span>
@@ -572,7 +578,7 @@ export default function Dashboard({ scannedData, budget: initialBudget, purpose:
             </div>
           )}
         </div>
-        
+
         {/* Panel 3: AI Insight */}
         <div className="panel ai-panel">
           <div className="panel-title">AI Insight</div>
