@@ -1,7 +1,8 @@
 import platform
 import re
-import wmi
-import pythoncom  # We need this to handle Windows threads
+if platform.system() == "Windows":
+    import wmi
+    import pythoncom  # We need this to handle Windows threads
 
 # Windows chassis types that mean laptop: 8 Portable, 9 Laptop, 10 Notebook,
 # 11 Handheld, 14 Sub Notebook, 30 Tablet, 31 Convertible, 32 Detachable
