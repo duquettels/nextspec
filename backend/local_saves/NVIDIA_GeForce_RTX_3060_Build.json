@@ -1,0 +1,13 @@
+{
+    "profile_name": "NVIDIA GeForce RTX 3060 Build",
+    "cpu": "Apple M-Series Processor",
+    "gpu": "NVIDIA GeForce RTX 3060",
+    "total_cost_usd": 279.99,
+    "ram_gb": 16,
+    "storage_gb": 512,
+    "upgraded_part": "NVIDIA GeForce RTX 3060",
+    "upgraded_category": "GPU",
+    "new_score": 49,
+    "perf_gain_pct": 0,
+    "file_path": "/Users/allenorozco/Documents/Documents - MacBook Pro (4)/UNCG Fall 2026/CSC 490 Cap Mac/nextspec/backend/local_saves/NVIDIA_GeForce_RTX_3060_Build.json"
+}

@@ -104,7 +104,7 @@ export default function App() {
   if (!setupComplete) {
     return (
       <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.95)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 9999 }}>
-        <div className="panel" style={{ width: "450px", padding: "30px", background: "var(--bg-panel)" }}>
+        <div className="panel" style={{ width: "min(450px, calc(100% - 32px))", maxHeight: "calc(100vh - 32px)", overflowY: "auto", padding: "30px", background: "var(--bg-panel)" }}>
           <h2 style={{ color: "var(--accent-cyan)", marginTop: 0 }}>Initialize NextSpec</h2>
           <p style={{ fontSize: "14px", color: "var(--text-muted)", marginBottom: "20px" }}>
             Configure your upgrade parameters before analyzing telemetry.
