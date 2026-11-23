@@ -131,3 +131,60 @@
   width: min(100%, 900px);
   margin-inline: auto;
 }
+
+/* This is for RealTimeClock */
+
+.header-status {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.rescan-button {
+  min-height: 36px;
+  padding: 5px 10px;
+  background: var(--accent-cyan);
+  color: #000;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.last-scan {
+  margin-right: 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* mobile fix for App JSX */
+@media (max-width: 768px) {
+  .header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .header-status {
+    width: 100%;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .rescan-button {
+    width: 100%;
+    min-height: 44px;
+  }
+  .profile{
+    flex-wrap: wrap;
+  }
+  .last-scan{
+    width: 100%;
+    margin-right: 0;
+  }
+  .header h1 {
+    font-size: 20px;
+  }
+}
